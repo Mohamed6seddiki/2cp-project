@@ -39,3 +39,15 @@ docker-compose.override.yml
 ############################
 coverage/
 *.db
+
+
+# .NET
+bin/
+obj/
+
+# Visual Studio
+.vs/
+.vscode/
+
+# Node
+node_modules/
