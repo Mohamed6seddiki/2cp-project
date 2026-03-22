@@ -11,6 +11,8 @@ import {
   UserCircle,
   Settings,
   LogOut,
+  ChartColumnBig,
+  Shield,
 } from 'lucide-react';
 import Button from '../ui/Button';
 import { useAuth } from '../../hooks/useAuth';
@@ -45,13 +47,23 @@ const Navbar: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [avatarMenuOpen]);
 
-  const navLinks = [
+  const studentNavLinks = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Lessons', path: '/lessons', icon: BookOpen },
     { name: 'Practice', path: '/practice', icon: Code2 },
     { name: 'Progress', path: '/progress', icon: LineChart },
     { name: 'Downloads', path: '/downloads', icon: Download },
   ];
+
+  const adminNavLinks = [
+    { name: 'Statistics', path: '/admin/statistics', icon: ChartColumnBig },
+    { name: 'Courses', path: '/admin/lessons', icon: BookOpen },
+    { name: 'Practice', path: '/admin/practice', icon: Code2 },
+    { name: 'Settings', path: '/settings', icon: Settings },
+    { name: 'Users', path: '/admin/users', icon: Shield },
+  ];
+
+  const navLinks = user?.role === 'admin' ? adminNavLinks : studentNavLinks;
 
   const handleLogout = () => {
     logout();
