@@ -124,8 +124,8 @@ const Dashboard = () => {
         {/* Sidebar Area: AI, Mini Challenge, Activity */}
         <div className="space-y-6">
           
-          {/* Quick AI Help */}
-          <Card className="p-6 bg-gradient-to-b from-surface to-surface-hover border-t-2 border-t-tertiary">
+          {/* Quick AI Help 
+            <Card className="p-6 bg-gradient-to-b from-surface to-surface-hover border-t-2 border-t-tertiary">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-tertiary/20 rounded-lg text-tertiary">
                 <Sparkles size={20} />
@@ -139,6 +139,12 @@ const Dashboard = () => {
               <MessageSquareIcon size={16} /> Ask AI Assistant
             </Button>
           </Card>
+          
+          
+          
+          
+          */}
+          
 
           {/* Mini Challenge */}
           <Card className="p-6">
