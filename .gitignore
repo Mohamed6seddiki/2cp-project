@@ -1,0 +1,53 @@
+############################
+# OS
+############################
+.DS_Store
+Thumbs.db
+
+############################
+# Node / React (Vite)
+############################
+node_modules/
+dist/
+.vite/
+.env
+.env.*
+
+############################
+# ASP.NET Core
+############################
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.cache
+*.log
+
+############################
+# Visual Studio Code
+############################
+.vscode/
+
+############################
+# Docker
+############################
+docker-compose.override.yml
+
+############################
+# Misc
+############################
+coverage/
+*.db
+
+
+# .NET
+bin/
+obj/
+
+# Visual Studio
+.vs/
+.vscode/
+
+# Node
+node_modules/
