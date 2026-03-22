@@ -24,6 +24,7 @@ import Downloads from './pages/student/Downloads';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ManageLessons from './pages/admin/ManageLessons';
 import ManageUsers from './pages/admin/ManageUsers';
+import AddPractice from './pages/admin/AddPractice';
 
 const RequireAuth = ({ children }: { children: ReactElement }) => {
   const { isAuthenticated } = useAuth();
@@ -166,7 +167,7 @@ function App() {
             path="/profile"
             element={
               <RequireAuth>
-                <RequireRole roles={['student']}>
+                <RequireRole roles={['student', 'admin']}>
                   <Profile />
                 </RequireRole>
               </RequireAuth>
@@ -228,6 +229,16 @@ function App() {
               <RequireAuth>
                 <RequireRole roles={['admin']}>
                   <ManageLessons />
+                </RequireRole>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/practice"
+            element={
+              <RequireAuth>
+                <RequireRole roles={['admin']}>
+                  <AddPractice />
                 </RequireRole>
               </RequireAuth>
             }

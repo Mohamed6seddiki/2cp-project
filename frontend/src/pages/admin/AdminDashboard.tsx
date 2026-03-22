@@ -2,8 +2,10 @@ import React from 'react';
 import { Bell, Clock3, Search, Users, Zap, Globe2, Signal } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
+import { useAuth } from '../../hooks/useAuth';
 
 const AdminDashboard = () => {
+  const { user } = useAuth();
   const monthlyStats = [
     {
       title: 'Total Monthly Users',
@@ -73,8 +75,8 @@ const AdminDashboard = () => {
           </button>
 
           <div className="rounded-xl border border-border bg-surface px-3 py-2">
-            <p className="text-xs text-text-muted">Admin User</p>
-            <p className="text-sm font-semibold">System Root</p>
+            <p className="text-xs text-text-muted">{user?.email ?? 'Admin'}</p>
+            <p className="text-sm font-semibold">{user?.name ?? 'Admin User'}</p>
           </div>
         </div>
       </div>
