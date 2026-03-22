@@ -102,7 +102,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         <div className="flex-1 overflow-y-auto py-6 px-4 flex flex-col gap-1">
           <div className="mb-3 px-2">
             <p className="text-lg font-bold">Algonova Dashboard</p>
-            <p className="text-[11px] uppercase tracking-wider text-text-muted">Algorithm Arc*/}hitect</p> 
+           <p className="text-[11px] uppercase tracking-wider text-text-muted">Algorithm Architect</p>
           </div>
 
           <div className="text-xs font-semibold text-text-muted mb-2 px-2 uppercase tracking-wider">
