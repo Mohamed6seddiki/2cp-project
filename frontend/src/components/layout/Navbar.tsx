@@ -80,11 +80,11 @@ const Navbar: React.FC = () => {
 
         {!isAuthenticated ? (
           <div className="ml-auto flex items-center gap-3">
-            <Link to="/auth/login" className="text-sm font-semibold text-text-muted transition-colors hover:text-text">
+            <Link to="/login" className="text-sm font-semibold text-text-muted transition-colors hover:text-text">
               Login
             </Link>
             <Button
-              to="/auth/register"
+              to="/register"
               className="h-9 min-h-0 rounded-md bg-[#00e5cc] px-5 py-1.5 text-sm font-bold tracking-wide text-[#0f1117] shadow-none hover:bg-[#00cbb4]"
             >
               Sign Up

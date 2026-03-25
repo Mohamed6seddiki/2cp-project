@@ -14,7 +14,11 @@ export const AppLayout: React.FC = () => {
   const { isAuthenticated } = useAuth();
 
   const isPublicPage =
-    !isAuthenticated || location.pathname === '/' || location.pathname.startsWith('/auth');
+    !isAuthenticated ||
+    location.pathname === '/' ||
+    location.pathname.startsWith('/auth') ||
+    location.pathname.startsWith('/login') ||
+    location.pathname.startsWith('/register');
 
   // If public page, we render a different layout
   if (isPublicPage) {

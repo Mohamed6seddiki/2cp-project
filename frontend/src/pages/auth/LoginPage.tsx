@@ -4,26 +4,19 @@ import { Mail, Lock, LogIn } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Card from '../../components/ui/Card';
-import { useAuth, type UserRole } from '../../hooks/useAuth';
+import { useAuth } from '../../hooks/useAuth';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('student');
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const payload = {
-      name: role === 'admin' ? 'Admin User' : 'Student User',
-      email,
-      role,
-    };
-
-    login(payload);
-    navigate(role === 'admin' ? '/admin/dashboard' : '/dashboard');
+    await login(email, password);
+    navigate('/dashboard');
   };
 
   return (
@@ -65,19 +58,6 @@ const LoginPage = () => {
                onChange={(e) => setPassword(e.target.value)}
                required
              />
-          </div>
-
-          <div className="flex flex-col gap-1.5 w-full">
-            <label className="text-sm font-medium text-text-muted">Login as</label>
-            <select
-              title="Login role"
-              value={role}
-              onChange={(e) => setRole(e.target.value as UserRole)}
-              className="w-full bg-background border border-border rounded-md px-3 py-2 text-text focus:outline-none focus:ring-1 focus:border-primary transition-all"
-            >
-              <option value="student">Student</option>
-              <option value="admin">Admin</option>
-            </select>
           </div>
 
           <div className="flex items-center justify-between text-sm">

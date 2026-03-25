@@ -92,32 +92,50 @@ CREATE TABLE IF NOT EXISTS student_general_exercises (
 -- TRIGGER — Auto-create user profile on signup
 -- ============================================================
 
-CREATE OR REPLACE FUNCTION handle_new_user()
+CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
-  v_username TEXT;
-  v_role     user_role;
+  v_base_username TEXT;
+  v_username      TEXT;
+  v_role_text     TEXT;
+  v_role          user_role := 'student';
+  v_attempt       INT := 0;
 BEGIN
-  v_username := COALESCE(
-    NEW.raw_user_meta_data->>'preferred_username',
-    NEW.raw_user_meta_data->>'name',
-    NEW.raw_user_meta_data->>'username',
-    split_part(NEW.email, '@', 1)
+  v_base_username := COALESCE(
+    NULLIF(LOWER(REGEXP_REPLACE(NEW.raw_user_meta_data->>'preferred_username', '[^a-z0-9_]+', '', 'g')), ''),
+    NULLIF(LOWER(REGEXP_REPLACE(NEW.raw_user_meta_data->>'name', '[^a-z0-9_]+', '', 'g')), ''),
+    NULLIF(LOWER(REGEXP_REPLACE(NEW.raw_user_meta_data->>'username', '[^a-z0-9_]+', '', 'g')), ''),
+    NULLIF(LOWER(REGEXP_REPLACE(split_part(NEW.email, '@', 1), '[^a-z0-9_]+', '', 'g')), ''),
+    'user_' || REPLACE(SUBSTRING(NEW.id::text, 1, 8), '-', '')
   );
 
-  v_role := COALESCE(
-    (NEW.raw_user_meta_data->>'role')::user_role,
-    'student'
-  );
+  v_username := v_base_username;
 
-  INSERT INTO public.users (id, email, username, password, role)
-  VALUES (NEW.id, NEW.email, v_username, '', v_role)
-  ON CONFLICT (id) DO UPDATE SET
-    email    = EXCLUDED.email,
-    username = COALESCE(EXCLUDED.username, public.users.username);
+  v_role_text := COALESCE(NEW.raw_user_meta_data->>'role', 'student');
+  IF v_role_text IN ('admin', 'student') THEN
+    v_role := v_role_text::user_role;
+  ELSE
+    v_role := 'student';
+  END IF;
+
+  LOOP
+    BEGIN
+      INSERT INTO public.users (id, email, username, password, role)
+      VALUES (NEW.id, NEW.email, v_username, '', v_role);
+      EXIT;
+    EXCEPTION
+      WHEN unique_violation THEN
+        v_attempt := v_attempt + 1;
+        IF v_attempt > 10 THEN
+          RAISE EXCEPTION 'Could not generate unique username for user %', NEW.id;
+        END IF;
+        v_username := v_base_username || '_' || SUBSTRING(MD5(NEW.id::text || CLOCK_TIMESTAMP()::text || v_attempt::text), 1, 6);
+    END;
+  END LOOP;
 
   IF v_role = 'admin' THEN
     INSERT INTO public.admins (id) VALUES (NEW.id) ON CONFLICT DO NOTHING;
@@ -126,6 +144,10 @@ BEGIN
   END IF;
 
   RETURN NEW;
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE LOG 'handle_new_user failed for id=%, email=%: %', NEW.id, NEW.email, SQLERRM;
+    RAISE;
 END;
 $$;
 
