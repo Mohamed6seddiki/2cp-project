@@ -1,13 +1,12 @@
-import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import type { ReactElement } from 'react';
 import AppLayout from './components/layout/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import LandingPage from './pages/public/LandingPage';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
-import Dashboard from './pages/Dashboard.jsx';
-import LessonDetails from './pages/LessonDetails.jsx';
 import { useAuth } from './hooks/useAuth';
+import StudentDashboard from './pages/student/Dashboard';
 import LessonsBrowser from './pages/student/LessonsBrowser';
 import LessonDetail from './pages/student/LessonDetail';
 import CodeEditorWorkspace from './pages/student/CodeEditorWorkspace';
@@ -27,6 +26,12 @@ function GuestOnly({ children }: { children: ReactElement }) {
   if (loading) return null;
   if (session) return <Navigate to="/dashboard" replace />;
   return children;
+}
+
+function LegacyLessonRedirect() {
+  const { lessonId } = useParams();
+  if (!lessonId) return <Navigate to="/lessons" replace />;
+  return <Navigate to={`/lesson/${lessonId}`} replace />;
 }
 
 function App() {
@@ -58,7 +63,7 @@ function App() {
             path="/dashboard"
             element={
               <ProtectedRoute roles={['student']}>
-                <Dashboard />
+                <StudentDashboard />
               </ProtectedRoute>
             }
           />
@@ -66,7 +71,7 @@ function App() {
             path="/lessons/:lessonId"
             element={
               <ProtectedRoute roles={['student']}>
-                <LessonDetails />
+                <LegacyLessonRedirect />
               </ProtectedRoute>
             }
           />

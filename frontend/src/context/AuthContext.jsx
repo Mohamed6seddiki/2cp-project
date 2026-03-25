@@ -17,6 +17,20 @@ const mapUser = (authUser) => {
   };
 };
 
+const getAuthErrorMessage = (error, fallbackMessage) => {
+  const rawMessage = typeof error?.message === 'string' ? error.message : '';
+  const normalized = rawMessage.toLowerCase();
+
+  if (!rawMessage) return fallbackMessage;
+  if (normalized.includes('invalid login credentials')) return 'Invalid email or password.';
+  if (normalized.includes('email not confirmed')) return 'Please confirm your email before signing in.';
+  if (normalized.includes('network') || normalized.includes('fetch')) {
+    return 'Network error. Please check your connection and try again.';
+  }
+
+  return rawMessage;
+};
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
@@ -108,21 +122,29 @@ export function AuthProvider({ children }) {
   }, [resolveUserProfile]);
 
   const login = useCallback(async (email, password) => {
+    const normalizedEmail = (email ?? '').trim().toLowerCase();
+    if (!normalizedEmail || !password) {
+      throw new Error('Email and password are required.');
+    }
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password,
       });
       if (error) throw error;
       return data;
     } catch (error) {
       console.error('[Auth] Login failed:', error);
-      throw error;
+      throw new Error(getAuthErrorMessage(error, 'Unable to login. Please try again.'));
     }
   }, []);
 
   const register = useCallback(async (email, password, username) => {
     const normalizedEmail = (email ?? '').trim().toLowerCase();
+    if (!normalizedEmail || !password) {
+      throw new Error('Email and password are required.');
+    }
 
     const buildUsername = (value, withSuffix = false) => {
       const base = (value ?? '')
@@ -173,7 +195,7 @@ export function AuthProvider({ children }) {
       throw error;
     } catch (error) {
       console.error('[Auth] Registration failed:', error);
-      throw error;
+      throw new Error(getAuthErrorMessage(error, 'Unable to register. Please try again.'));
     }
   }, []);
 
@@ -183,7 +205,7 @@ export function AuthProvider({ children }) {
       if (error) throw error;
     } catch (error) {
       console.error('[Auth] Logout failed:', error);
-      throw error;
+      throw new Error(getAuthErrorMessage(error, 'Unable to logout. Please try again.'));
     }
   }, []);
 

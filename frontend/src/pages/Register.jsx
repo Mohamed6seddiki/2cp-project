@@ -7,7 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 
 export default function Register() {
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register, getHomePath } = useAuth();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,7 +29,7 @@ export default function Register() {
         return;
       }
 
-      navigate('/dashboard', { replace: true });
+      navigate(getHomePath(), { replace: true });
     } catch (err) {
       const rawMessage = err?.message ?? 'Unable to register. Please try again.';
       if (rawMessage.includes('Database error saving new user')) {

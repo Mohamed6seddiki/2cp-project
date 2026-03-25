@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camera, Edit2, MapPin, Link as LinkIcon, Calendar, Github, Twitter, Award, Medal } from 'lucide-react';
+import { Camera, Edit2, MapPin, Link as LinkIcon, Calendar, Github, Twitter, Award, Medal, CheckCircle2, AlertCircle, Clock as ClockIcon } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
@@ -137,8 +137,5 @@ const Profile = () => {
     </div>
   );
 };
-
-// extracted imports missing
-import { CheckCircle2, AlertCircle, Clock as ClockIcon } from 'lucide-react';
 
 export default Profile;

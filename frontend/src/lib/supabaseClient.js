@@ -3,13 +3,19 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error(
-    '[Supabase] Missing environment variables. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+const missingVars = [];
+
+if (!supabaseUrl) missingVars.push('VITE_SUPABASE_URL');
+if (!supabaseAnonKey) missingVars.push('VITE_SUPABASE_ANON_KEY');
+
+if (missingVars.length > 0) {
+  throw new Error(
+    `[Supabase] Missing required environment variables: ${missingVars.join(', ')}. ` +
+      'Copy frontend/.env.example to frontend/.env and fill the values.',
   );
 }
 
-export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '', {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { AuthProvider, useAuthContext } from '../context/AuthContext.jsx';
 
 export type UserRole = 'student' | 'admin';

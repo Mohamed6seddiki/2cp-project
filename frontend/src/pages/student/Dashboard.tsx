@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  PlayCircle, Code2, Trophy, Flame, Target, 
-  ArrowRight, Sparkles, Clock, CheckCircle2 
+  PlayCircle, Code2, Trophy, Flame, Target,
+  ArrowRight, Clock, CheckCircle2, BookOpen as BookOpenIcon
 } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -187,8 +187,5 @@ const Dashboard = () => {
     </div>
   );
 };
-
-// Extracted icons missing from lucide import above
-import { BookOpen as BookOpenIcon, MessageSquare as MessageSquareIcon } from 'lucide-react';
 
 export default Dashboard;

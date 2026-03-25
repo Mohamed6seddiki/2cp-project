@@ -81,6 +81,13 @@ If your file has another name, replace `test.algo` with your file name.
 
 ### Option B: CMake (recommended)
 
+If you copied this repo from another machine and see a CMake cache/source mismatch,
+remove the stale build directory first:
+
+```bash
+rm -rf build
+```
+
 ```bash
 cmake -S . -B build
 cmake --build build
@@ -89,10 +96,14 @@ cmake --build build
 Run a sample program:
 
 ```bash
-./build/Release/myalgo.exe examples/hello.algo
+./build/myalgo examples/hello.algo
 ```
 
-If your generator/config differs, the binary path may be `build/myalgo` or `build/Debug/myalgo.exe`.
+On Windows with Visual Studio generator, the binary path is typically:
+
+```powershell
+.\build\Debug\myalgo.exe examples\hello.algo
+```
 
 ### Option C: CMake Presets
 
@@ -101,6 +112,13 @@ This repository provides presets in `CMakePresets.json`:
 ```bash
 cmake --preset default
 cmake --build --preset default
+```
+
+Windows Visual Studio preset:
+
+```powershell
+cmake --preset vs2022
+cmake --build --preset vs2022
 ```
 
 ## Quick language example
@@ -167,7 +185,7 @@ Sample programs are available in `examples/`:
 Run any example:
 
 ```bash
-./build/Release/myalgo.exe examples/factorial.algo
+./build/myalgo examples/factorial.algo
 ```
 
 ## Testing
@@ -177,7 +195,7 @@ The `testes/` folder contains `.algo` scenario files and generated `.cpp/.exe` o
 Run an individual test file:
 
 ```bash
-./build/Release/myalgo.exe testes/test_all_features.algo
+./build/myalgo testes/test_all_features.algo
 ```
 
 ## Known limitations (current)

@@ -1,7 +1,7 @@
 {
 	"InstallScripts" : 
 	[
-		"C:/Users/MASSIVE/Desktop/projects/MyAlgo/build/cmake_install.cmake"
+		"/home/seddiki/Desktop/projet/2cp project/myalgo-engine/build/cmake_install.cmake"
 	],
 	"Parallel" : false
 }

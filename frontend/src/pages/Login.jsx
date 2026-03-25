@@ -7,7 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, getHomePath } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -20,7 +20,7 @@ export default function Login() {
 
     try {
       await login(email, password);
-      navigate('/dashboard', { replace: true });
+      navigate(getHomePath(), { replace: true });
     } catch (err) {
       const rawMessage = err?.message ?? '';
       if (rawMessage.toLowerCase().includes('email not confirmed')) {

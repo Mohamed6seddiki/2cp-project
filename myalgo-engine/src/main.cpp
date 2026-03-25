@@ -182,10 +182,16 @@ int main(int argc, char* argv[]) {
         
         string cppFile = outputFilename;
         string baseName = outputFilename.substr(0, outputFilename.find_last_of("."));
-        string exeFile = baseName + ".exe";
+
+        string exeFile;
+        #ifdef _WIN32
+            exeFile = baseName + ".exe";
+        #else
+            exeFile = baseName;
+        #endif
         
         // Compile the C++ code
-        string compileCmd = "g++ -std=c++11 \"" + cppFile + "\" -o \"" + exeFile + "\"";
+        string compileCmd = "g++ -std=c++17 \"" + cppFile + "\" -o \"" + exeFile + "\"";
         //cout << "Compiling: " << compileCmd << endl;
         
         int compileResult = system(compileCmd.c_str());
@@ -201,7 +207,12 @@ int main(int argc, char* argv[]) {
         #ifdef _WIN32
             runCmd = "\"" + exeFile + "\"";
         #else
-            runCmd = "./\"" + baseName + "\"";
+            string runTarget = exeFile;
+            bool isAbsolutePath = !runTarget.empty() && runTarget[0] == '/';
+            if (!isAbsolutePath) {
+                runTarget = "./" + runTarget;
+            }
+            runCmd = "\"" + runTarget + "\"";
         #endif
         
         int runResult = system(runCmd.c_str());
