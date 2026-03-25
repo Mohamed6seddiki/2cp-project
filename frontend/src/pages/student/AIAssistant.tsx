@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Send, Bot, User, Sparkles, Code2, Search, History, HelpCircle, FileText, Zap } from 'lucide-react';
+import { Send, Bot, User, Sparkles, Code2, History, HelpCircle, FileText, Zap } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
-import Input from '../../components/ui/Input';
 import Badge from '../../components/ui/Badge';
 
 const AIAssistant = () => {

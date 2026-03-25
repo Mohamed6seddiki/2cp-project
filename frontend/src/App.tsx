@@ -1,266 +1,202 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import type { ReactElement } from 'react';
 import AppLayout from './components/layout/AppLayout';
-import { useAuth } from './hooks/useAuth';
-
-// Public & Auth Pages
+import ProtectedRoute from './components/ProtectedRoute';
 import LandingPage from './pages/public/LandingPage';
-import LoginPage from './pages/auth/LoginPage';
-import RegisterPage from './pages/auth/RegisterPage';
-
-// Student Pages
-import Dashboard from './pages/student/Dashboard';
+import Login from './pages/Login.jsx';
+import Register from './pages/Register.jsx';
+import { useAuth } from './hooks/useAuth';
+import StudentDashboard from './pages/student/Dashboard';
 import LessonsBrowser from './pages/student/LessonsBrowser';
 import LessonDetail from './pages/student/LessonDetail';
 import CodeEditorWorkspace from './pages/student/CodeEditorWorkspace';
-import AIAssistant from './pages/student/AIAssistant';
 import Progress from './pages/student/Progress';
+import Downloads from './pages/student/Downloads';
+import AIAssistant from './pages/student/AIAssistant';
 import Profile from './pages/student/Profile';
 import Settings from './pages/student/Settings';
 import Leaderboard from './pages/student/Leaderboard';
-import Downloads from './pages/student/Downloads';
-
-// Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ManageLessons from './pages/admin/ManageLessons';
-import ManageUsers from './pages/admin/ManageUsers';
 import AddPractice from './pages/admin/AddPractice';
+import ManageUsers from './pages/admin/ManageUsers';
 
-const RequireAuth = ({ children }: { children: ReactElement }) => {
-  const { isAuthenticated } = useAuth();
-
-  if (!isAuthenticated) {
-    return <Navigate to="/auth/login" replace />;
-  }
-
+function GuestOnly({ children }: { children: ReactElement }) {
+  const { session, loading } = useAuth();
+  if (loading) return null;
+  if (session) return <Navigate to="/dashboard" replace />;
   return children;
-};
+}
 
-const RequireRole = ({
-  children,
-  roles,
-}: {
-  children: ReactElement;
-  roles: Array<'student' | 'admin'>;
-}) => {
-  const { user, getHomePath } = useAuth();
-
-  if (!user) {
-    return <Navigate to="/auth/login" replace />;
-  }
-
-  if (!roles.includes(user.role)) {
-    return <Navigate to={getHomePath()} replace />;
-  }
-
-  return children;
-};
-
-const GuestOnly = ({ children }: { children: ReactElement }) => {
-  const { isAuthenticated, getHomePath } = useAuth();
-
-  if (isAuthenticated) {
-    return <Navigate to={getHomePath()} replace />;
-  }
-
-  return children;
-};
+function LegacyLessonRedirect() {
+  const { lessonId } = useParams();
+  if (!lessonId) return <Navigate to="/lessons" replace />;
+  return <Navigate to={`/lesson/${lessonId}`} replace />;
+}
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route element={<AppLayout />}>
-          {/* Public */}
           <Route path="/" element={<LandingPage />} />
-          
-          {/* Auth */}
           <Route
-            path="/auth/login"
+            path="/login"
             element={
               <GuestOnly>
-                <LoginPage />
+                <Login />
               </GuestOnly>
             }
           />
           <Route
-            path="/auth/register"
+            path="/register"
             element={
               <GuestOnly>
-                <RegisterPage />
+                <Register />
               </GuestOnly>
             }
           />
+          <Route path="/auth/login" element={<Navigate to="/login" replace />} />
+          <Route path="/auth/register" element={<Navigate to="/register" replace />} />
 
-          {/* Student Routes */}
           <Route
             path="/dashboard"
             element={
-              <RequireAuth>
-                <RequireRole roles={['student']}>
-                  <Dashboard />
-                </RequireRole>
-              </RequireAuth>
+              <ProtectedRoute roles={['student']}>
+                <StudentDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/lessons/:lessonId"
+            element={
+              <ProtectedRoute roles={['student']}>
+                <LegacyLessonRedirect />
+              </ProtectedRoute>
             }
           />
           <Route
             path="/lessons"
             element={
-              <RequireAuth>
-                <RequireRole roles={['student']}>
-                  <LessonsBrowser />
-                </RequireRole>
-              </RequireAuth>
+              <ProtectedRoute roles={['student']}>
+                <LessonsBrowser />
+              </ProtectedRoute>
             }
           />
           <Route
             path="/lesson/:id"
             element={
-              <RequireAuth>
-                <RequireRole roles={['student']}>
-                  <LessonDetail />
-                </RequireRole>
-              </RequireAuth>
+              <ProtectedRoute roles={['student']}>
+                <LessonDetail />
+              </ProtectedRoute>
             }
           />
           <Route
             path="/practice"
             element={
-              <RequireAuth>
-                <RequireRole roles={['student']}>
-                  <CodeEditorWorkspace />
-                </RequireRole>
-              </RequireAuth>
+              <ProtectedRoute roles={['student']}>
+                <CodeEditorWorkspace />
+              </ProtectedRoute>
             }
           />
           <Route
             path="/progress"
             element={
-              <RequireAuth>
-                <RequireRole roles={['student']}>
-                  <Progress />
-                </RequireRole>
-              </RequireAuth>
+              <ProtectedRoute roles={['student']}>
+                <Progress />
+              </ProtectedRoute>
             }
           />
           <Route
             path="/downloads"
             element={
-              <RequireAuth>
-                <RequireRole roles={['student']}>
-                  <Downloads />
-                </RequireRole>
-              </RequireAuth>
+              <ProtectedRoute roles={['student']}>
+                <Downloads />
+              </ProtectedRoute>
             }
           />
           <Route
             path="/assistant"
             element={
-              <RequireAuth>
-                <RequireRole roles={['student']}>
-                  <AIAssistant />
-                </RequireRole>
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <RequireAuth>
-                <RequireRole roles={['student', 'admin']}>
-                  <Profile />
-                </RequireRole>
-              </RequireAuth>
+              <ProtectedRoute roles={['student']}>
+                <AIAssistant />
+              </ProtectedRoute>
             }
           />
           <Route
             path="/leaderboard"
             element={
-              <RequireAuth>
-                <RequireRole roles={['student']}>
-                  <Leaderboard />
-                </RequireRole>
-              </RequireAuth>
+              <ProtectedRoute roles={['student']}>
+                <Leaderboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute roles={['student', 'admin']}>
+                <Profile />
+              </ProtectedRoute>
             }
           />
           <Route
             path="/settings"
             element={
-              <RequireAuth>
+              <ProtectedRoute roles={['student', 'admin']}>
                 <Settings />
-              </RequireAuth>
+              </ProtectedRoute>
             }
           />
 
-          {/* Admin Routes */}
           <Route
             path="/admin"
             element={
-              <RequireAuth>
-                <RequireRole roles={['admin']}>
-                  <Navigate to="/admin/dashboard" replace />
-                </RequireRole>
-              </RequireAuth>
+              <ProtectedRoute roles={['admin']}>
+                <Navigate to="/admin/dashboard" replace />
+              </ProtectedRoute>
             }
           />
           <Route
             path="/admin/dashboard"
             element={
-              <RequireAuth>
-                <RequireRole roles={['admin']}>
-                  <AdminDashboard />
-                </RequireRole>
-              </RequireAuth>
+              <ProtectedRoute roles={['admin']}>
+                <AdminDashboard />
+              </ProtectedRoute>
             }
           />
           <Route
             path="/admin/statistics"
             element={
-              <RequireAuth>
-                <RequireRole roles={['admin']}>
-                  <AdminDashboard />
-                </RequireRole>
-              </RequireAuth>
+              <ProtectedRoute roles={['admin']}>
+                <AdminDashboard />
+              </ProtectedRoute>
             }
           />
           <Route
             path="/admin/lessons"
             element={
-              <RequireAuth>
-                <RequireRole roles={['admin']}>
-                  <ManageLessons />
-                </RequireRole>
-              </RequireAuth>
+              <ProtectedRoute roles={['admin']}>
+                <ManageLessons />
+              </ProtectedRoute>
             }
           />
           <Route
             path="/admin/practice"
             element={
-              <RequireAuth>
-                <RequireRole roles={['admin']}>
-                  <AddPractice />
-                </RequireRole>
-              </RequireAuth>
+              <ProtectedRoute roles={['admin']}>
+                <AddPractice />
+              </ProtectedRoute>
             }
           />
           <Route
             path="/admin/users"
             element={
-              <RequireAuth>
-                <RequireRole roles={['admin']}>
-                  <ManageUsers />
-                </RequireRole>
-              </RequireAuth>
+              <ProtectedRoute roles={['admin']}>
+                <ManageUsers />
+              </ProtectedRoute>
             }
           />
-
-          {/* Fallback */}
-          <Route path="*" element={
-            <div className="flex flex-col items-center justify-center p-8 text-center min-h-[60vh]">
-              <h1 className="text-4xl font-bold text-primary mb-4">404</h1>
-              <p className="text-xl text-text-muted">Oops! We couldn't find that page.</p>
-            </div>
-          } />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
     </Router>

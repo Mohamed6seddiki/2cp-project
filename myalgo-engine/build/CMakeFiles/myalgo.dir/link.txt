@@ -1,0 +1,1 @@
+/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/myalgo.dir/link.d CMakeFiles/myalgo.dir/src/main.cpp.o CMakeFiles/myalgo.dir/src/lexer/lexer.cpp.o CMakeFiles/myalgo.dir/src/parser/parser.cpp.o -o myalgo

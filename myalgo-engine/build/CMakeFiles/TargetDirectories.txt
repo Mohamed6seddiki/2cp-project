@@ -1,0 +1,3 @@
+/home/seddiki/Desktop/projet/2cp project/myalgo-engine/build/CMakeFiles/myalgo.dir
+/home/seddiki/Desktop/projet/2cp project/myalgo-engine/build/CMakeFiles/edit_cache.dir
+/home/seddiki/Desktop/projet/2cp project/myalgo-engine/build/CMakeFiles/rebuild_cache.dir
