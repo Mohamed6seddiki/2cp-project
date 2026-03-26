@@ -1,42 +1,52 @@
-import React, { useState } from 'react';
-import { Search, Filter, Clock, BookOpen, CheckCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Search, Filter, Clock, BookOpen } from 'lucide-react';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
+import { getLessons, type LessonDto } from '../../api/lessonsApi';
 
 const LessonsBrowser = () => {
   const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [lessons, setLessons] = useState<LessonDto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const categories = ['All', 'In Progress', 'Beginner', 'Intermediate', 'Advanced', 'Completed'];
+  const categories = ['All', 'Beginner', 'Intermediate', 'Advanced'];
 
-  const lessons = [
-    { id: 'intro', title: 'Introduction to Algorithms', desc: 'Learn what algorithms are and why they matter.', diff: 'Beginner', time: '10 min', status: 'Completed', progress: 100 },
-    { id: 'big-o', title: 'Big O Notation', desc: 'Understand time and space complexity with simple analogies.', diff: 'Beginner', time: '15 min', status: 'Completed', progress: 100 },
-    { id: 'arrays-strings', title: 'Arrays & Strings', desc: 'Master the fundamental data structures used everywhere.', diff: 'Beginner', time: '20 min', status: 'In Progress', progress: 40 },
-    { id: 'binary-search', title: 'Binary Search', desc: 'Find elements in O(log N) time on sorted collections.', diff: 'Intermediate', time: '25 min', status: 'Not Started', progress: 0 },
-    { id: 'two-pointers', title: 'Two Pointers Technique', desc: 'Optimize array iterations with this powerful pattern.', diff: 'Intermediate', time: '30 min', status: 'Not Started', progress: 0 },
-    { id: 'dynamic-programming', title: 'Dynamic Programming', desc: 'Solve complex problems by breaking them down.', diff: 'Advanced', time: '45 min', status: 'Not Started', progress: 0 },
-  ];
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const data = await getLessons();
+        setLessons(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load lessons.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const filteredLessons = lessons.filter((lesson) => {
-    const matchesSearch = `${lesson.title} ${lesson.desc}`
+    load();
+  }, []);
+
+  const filteredLessons = useMemo(() => lessons.filter((lesson) => {
+    const matchesSearch = `${lesson.title} ${lesson.description}`
       .toLowerCase()
       .includes(searchQuery.toLowerCase().trim());
 
     if (!matchesSearch) return false;
 
     if (activeFilter === 'All') return true;
-    if (activeFilter === 'Completed') return lesson.status === 'Completed';
-    if (activeFilter === 'In Progress') return lesson.status === 'In Progress';
-    return lesson.diff === activeFilter;
-  });
+    return lesson.difficulty === activeFilter;
+  }), [activeFilter, lessons, searchQuery]);
 
-  const progressWidths: Record<number, string> = {
-    0: 'w-0',
-    40: 'w-[40%]',
-    100: 'w-full',
+  const badgeByDifficulty: Record<LessonDto['difficulty'], 'success' | 'warning' | 'danger'> = {
+    Beginner: 'success',
+    Intermediate: 'warning',
+    Advanced: 'danger',
   };
 
   return (
@@ -91,49 +101,40 @@ const LessonsBrowser = () => {
         ))}
       </div>
 
-      {/* Grid */}
+      {loading && <p className="text-text-muted">Loading lessons...</p>}
+      {error && <p className="text-danger">{error}</p>}
+
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6 pt-4">
         {filteredLessons.map((lesson) => (
           <Card key={lesson.id} hoverable className="flex flex-col h-full overflow-hidden">
             <div className="p-6 flex-1 flex flex-col">
               <div className="flex justify-between items-start mb-4">
-                <Badge variant={
-                  lesson.diff === 'Beginner' ? 'success' : 
-                  lesson.diff === 'Intermediate' ? 'warning' : 'danger'
-                }>
-                  {lesson.diff}
+                <Badge variant={badgeByDifficulty[lesson.difficulty]}>
+                  {lesson.difficulty}
                 </Badge>
-                {lesson.status === 'Completed' && <CheckCircle size={20} className="text-success" />}
               </div>
               
               <h3 className="text-xl font-bold mb-2 leading-tight">{lesson.title}</h3>
-              <p className="text-text-muted text-sm mb-6 flex-1">{lesson.desc}</p>
+              <p className="text-text-muted text-sm mb-6 flex-1">{lesson.description}</p>
               
               <div className="flex items-center gap-4 text-xs font-medium text-text-muted mt-auto mb-4">
-                <span className="flex items-center gap-1"><Clock size={14} /> {lesson.time}</span>
+                <span className="flex items-center gap-1"><Clock size={14} /> {lesson.estimatedMinutes} min</span>
                 <span className="flex items-center gap-1"><BookOpen size={14} /> Theory + Practice</span>
               </div>
-              
-              {lesson.status !== 'Completed' && (
-                <div className="w-full bg-surface-hover rounded-full h-1.5 mb-4 overflow-hidden">
-                  <div className={`bg-primary h-1.5 rounded-full ${progressWidths[lesson.progress] ?? 'w-0'}`}></div>
-                </div>
-              )}
 
               <Button
-                variant={lesson.status === 'Completed' ? 'secondary' : 'primary'} 
+                variant="primary"
                 fullWidth 
                 className="gap-2 mt-auto"
                 to={`/lesson/${lesson.id}`}
               >
-                {lesson.status === 'Completed' ? 'Review Lesson' : 
-                 lesson.status === 'In Progress' ? 'Continue Learning' : 'Start Lesson'}
+                Open Lesson
               </Button>
             </div>
           </Card>
         ))}
       </div>
-      {filteredLessons.length === 0 && (
+      {!loading && filteredLessons.length === 0 && (
         <Card className="p-8 text-center">
           <h3 className="text-xl font-semibold mb-2">No lessons found</h3>
           <p className="text-text-muted mb-4">

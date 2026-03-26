@@ -1,15 +1,49 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Target, Award, Code2, BookOpen, TrendingUp, Calendar, Zap, Clock } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
+import { getMyProgress, type ProgressDto } from '../../api/progressApi';
 
 const Progress = () => {
+  const [progress, setProgress] = useState<ProgressDto | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
   const skillWidths: Record<number, string> = {
     15: 'w-[15%]',
     40: 'w-[40%]',
     60: 'w-[60%]',
     85: 'w-[85%]',
   };
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const data = await getMyProgress();
+        setProgress(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load progress.');
+        setProgress(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, []);
+
+  const lessonExercisesCount = progress?.lessonExercises?.length ?? 0;
+  const generalExercisesCount = progress?.generalExercises?.length ?? 0;
+  const totalExercises = lessonExercisesCount + generalExercisesCount;
+  const completedCount = useMemo(
+    () => (progress?.lessonExercises ?? []).filter((x) => x.completed).length
+      + (progress?.generalExercises ?? []).filter((x) => x.completed).length,
+    [progress],
+  );
+  const accuracy = totalExercises > 0 ? Math.round((completedCount / totalExercises) * 100) : 0;
+  const overallMastery = Math.min(100, Math.round((progress?.totalScore ?? 0) / 10));
 
   return (
     <div className="space-y-8 pb-12">
@@ -22,18 +56,21 @@ const Progress = () => {
           <TrendingUp className="text-primary" size={20} />
           <div>
             <p className="text-xs text-text-muted uppercase tracking-wider font-bold">Overall Mastery</p>
-            <p className="text-xl font-bold">42%</p>
+            <p className="text-xl font-bold">{overallMastery}%</p>
           </div>
         </div>
       </div>
 
+      {loading && <p className="text-text-muted">Loading progress...</p>}
+      {error && <p className="text-danger">{error}</p>}
+
       {/* Main Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { icon: BookOpen, label: 'Lessons Done', value: '24', total: '/ 60', color: 'text-primary', badge: '+3 this week' },
-          { icon: Code2, label: 'Exercises', value: '118', total: '/ 300', color: 'text-tertiary', badge: 'Top 20%' },
-          { icon: Target, label: 'Avg Accuracy', value: '92', total: '%', color: 'text-success', badge: 'Excellent' },
-          { icon: Clock, label: 'Time Spent', value: '45', total: 'hrs', color: 'text-warning', badge: 'Consistent' }
+          { icon: BookOpen, label: 'Lesson Exercises', value: `${lessonExercisesCount}`, total: '', color: 'text-primary', badge: 'Submitted' },
+          { icon: Code2, label: 'General Exercises', value: `${generalExercisesCount}`, total: '', color: 'text-tertiary', badge: 'Submitted' },
+          { icon: Target, label: 'Completion', value: `${accuracy}`, total: '%', color: 'text-success', badge: 'Completion Rate' },
+          { icon: Clock, label: 'Total Score', value: `${progress?.totalScore ?? 0}`, total: 'pts', color: 'text-warning', badge: 'Current' }
         ].map((stat, i) => (
           <Card key={i} className="p-5 flex flex-col hoverable relative overflow-hidden group">
             <div className={`absolute -right-6 -bottom-6 opacity-5 group-hover:scale-125 transition-transform duration-500 ${stat.color}`}>
@@ -128,10 +165,10 @@ const Progress = () => {
               </h3>
               <div className="space-y-4 relative before:absolute before:inset-0 before:ml-[11px] before:h-full before:w-0.5 before:bg-border">
                  {[
-                   { title: 'Bronze Coder', desc: 'Solved 10 exercises', done: true },
-                   { title: '7-Day Streak', desc: 'Practiced 7 days in a row', done: true },
-                   { title: 'Tree Master', desc: 'Complete all Tree lessons', done: false, active: true },
-                   { title: 'Halfway There', desc: 'Reach 50% overall mastery', done: false },
+                   { title: 'First Submission', desc: 'Submit your first exercise', done: totalExercises >= 1 },
+                   { title: 'Consistent Solver', desc: 'Submit 10 exercises', done: totalExercises >= 10 },
+                   { title: 'Point Collector', desc: 'Reach 100 total points', done: (progress?.totalScore ?? 0) >= 100, active: (progress?.totalScore ?? 0) < 100 },
+                   { title: 'Mastery Rising', desc: 'Reach 50% overall mastery', done: overallMastery >= 50 },
                  ].map((ms, i) => (
                    <div key={i} className="relative flex items-start gap-4 pb-4">
                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 z-10 ${ms.done ? 'bg-warning border-warning text-surface' : ms.active ? 'bg-background border-warning' : 'bg-surface border-border text-transparent'}`}>

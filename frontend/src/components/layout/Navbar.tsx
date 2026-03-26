@@ -8,6 +8,7 @@ import {
   Code2,
   LineChart,
   Download,
+  ListChecks,
   UserCircle,
   Settings,
   LogOut,
@@ -50,6 +51,7 @@ const Navbar: React.FC = () => {
   const studentNavLinks = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Lessons', path: '/lessons', icon: BookOpen },
+    { name: 'Exercises', path: '/exercises', icon: ListChecks },
     { name: 'Practice', path: '/practice', icon: Code2 },
     { name: 'Progress', path: '/progress', icon: LineChart },
     { name: 'Downloads', path: '/downloads', icon: Download },
