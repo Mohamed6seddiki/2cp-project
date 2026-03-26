@@ -471,10 +471,19 @@ DROP POLICY IF EXISTS "admins_self"             ON admins;
 DROP POLICY IF EXISTS "students_self"           ON students;
 DROP POLICY IF EXISTS "lessons_read"            ON lessons;
 DROP POLICY IF EXISTS "lessons_write"           ON lessons;
+DROP POLICY IF EXISTS "lessons_insert"          ON lessons;
+DROP POLICY IF EXISTS "lessons_update"          ON lessons;
+DROP POLICY IF EXISTS "lessons_delete"          ON lessons;
 DROP POLICY IF EXISTS "lesson_exercises_read"   ON lesson_exercises;
 DROP POLICY IF EXISTS "lesson_exercises_write"  ON lesson_exercises;
+DROP POLICY IF EXISTS "lesson_exercises_insert" ON lesson_exercises;
+DROP POLICY IF EXISTS "lesson_exercises_update" ON lesson_exercises;
+DROP POLICY IF EXISTS "lesson_exercises_delete" ON lesson_exercises;
 DROP POLICY IF EXISTS "general_exercises_read"  ON general_exercises;
 DROP POLICY IF EXISTS "general_exercises_write" ON general_exercises;
+DROP POLICY IF EXISTS "general_exercises_insert" ON general_exercises;
+DROP POLICY IF EXISTS "general_exercises_update" ON general_exercises;
+DROP POLICY IF EXISTS "general_exercises_delete" ON general_exercises;
 DROP POLICY IF EXISTS "sle_policy"              ON student_lesson_exercises;
 DROP POLICY IF EXISTS "sge_policy"              ON student_general_exercises;
 
@@ -482,7 +491,7 @@ CREATE POLICY "users_self" ON users
   FOR ALL USING (auth.uid() = id OR EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
 
 CREATE POLICY "admins_self" ON admins
-  FOR SELECT USING (auth.uid() = id OR EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+  FOR SELECT USING (auth.uid() = id);
 
 CREATE POLICY "students_self" ON students
   FOR ALL USING (auth.uid() = id OR EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
@@ -490,20 +499,44 @@ CREATE POLICY "students_self" ON students
 CREATE POLICY "lessons_read" ON lessons
   FOR SELECT USING (auth.role() = 'authenticated');
 
-CREATE POLICY "lessons_write" ON lessons
-  FOR ALL USING (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+CREATE POLICY "lessons_insert" ON lessons
+  FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+
+CREATE POLICY "lessons_update" ON lessons
+  FOR UPDATE
+  USING (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()))
+  WITH CHECK (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+
+CREATE POLICY "lessons_delete" ON lessons
+  FOR DELETE USING (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
 
 CREATE POLICY "lesson_exercises_read" ON lesson_exercises
   FOR SELECT USING (auth.role() = 'authenticated');
 
-CREATE POLICY "lesson_exercises_write" ON lesson_exercises
-  FOR ALL USING (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+CREATE POLICY "lesson_exercises_insert" ON lesson_exercises
+  FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+
+CREATE POLICY "lesson_exercises_update" ON lesson_exercises
+  FOR UPDATE
+  USING (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()))
+  WITH CHECK (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+
+CREATE POLICY "lesson_exercises_delete" ON lesson_exercises
+  FOR DELETE USING (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
 
 CREATE POLICY "general_exercises_read" ON general_exercises
   FOR SELECT USING (auth.role() = 'authenticated');
 
-CREATE POLICY "general_exercises_write" ON general_exercises
-  FOR ALL USING (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+CREATE POLICY "general_exercises_insert" ON general_exercises
+  FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+
+CREATE POLICY "general_exercises_update" ON general_exercises
+  FOR UPDATE
+  USING (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()))
+  WITH CHECK (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+
+CREATE POLICY "general_exercises_delete" ON general_exercises
+  FOR DELETE USING (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
 
 CREATE POLICY "sle_policy" ON student_lesson_exercises
   FOR ALL USING (student_id = auth.uid() OR EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));

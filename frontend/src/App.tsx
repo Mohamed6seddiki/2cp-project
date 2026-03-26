@@ -9,6 +9,7 @@ import { useAuth } from './hooks/useAuth';
 import StudentDashboard from './pages/student/Dashboard';
 import LessonsBrowser from './pages/student/LessonsBrowser';
 import LessonDetail from './pages/student/LessonDetail';
+import ExercisesPage from './pages/student/ExercisesPage';
 import CodeEditorWorkspace from './pages/student/CodeEditorWorkspace';
 import Progress from './pages/student/Progress';
 import Downloads from './pages/student/Downloads';
@@ -88,6 +89,14 @@ function App() {
             element={
               <ProtectedRoute roles={['student']}>
                 <LessonDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/exercises"
+            element={
+              <ProtectedRoute roles={['student']}>
+                <ExercisesPage />
               </ProtectedRoute>
             }
           />

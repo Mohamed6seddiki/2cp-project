@@ -1,125 +1,160 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import {
+  getMe,
+  login as loginApi,
+  logout as logoutApi,
+  refresh as refreshApi,
+  register as registerApi,
+} from '../api/authApi';
+import {
+  clearAuthTokens,
+  configureAuthHttp,
+  getAccessToken,
+  getRefreshToken,
+  setAuthTokens,
+} from '../api/httpClient';
 
 const AuthContext = createContext(undefined);
 
-const mapUser = (authUser) => {
-  if (!authUser) return null;
+const normalizeRole = (role) => {
+  const normalized = typeof role === 'string' ? role.trim().toLowerCase() : '';
+  return normalized === 'admin' ? 'admin' : 'student';
+};
 
-  const metadata = authUser.user_metadata ?? {};
+const normalizeUser = (user) => {
+  if (!user || typeof user !== 'object') {
+    return null;
+  }
+
+  const email = typeof user.email === 'string' ? user.email.trim().toLowerCase() : '';
+  const username = typeof user.username === 'string' && user.username.trim()
+    ? user.username.trim()
+    : (email.includes('@') ? email.split('@')[0] : 'learner');
+  const name = typeof user.name === 'string' && user.name.trim()
+    ? user.name.trim()
+    : username;
+
   return {
-    id: authUser.id,
-    email: authUser.email ?? '',
-    username: metadata.username ?? '',
-    name: metadata.username ?? authUser.email?.split('@')[0] ?? 'User',
-    role: metadata.role ?? 'student',
-    raw: authUser,
+    ...user,
+    id: typeof user.id === 'string' ? user.id : '',
+    email,
+    username,
+    name,
+    role: normalizeRole(user.role),
   };
 };
 
 const getAuthErrorMessage = (error, fallbackMessage) => {
-  const rawMessage = typeof error?.message === 'string' ? error.message : '';
-  const normalized = rawMessage.toLowerCase();
+  const raw = typeof error?.message === 'string' ? error.message : '';
+  if (!raw) return fallbackMessage;
 
-  if (!rawMessage) return fallbackMessage;
-  if (normalized.includes('invalid login credentials')) return 'Invalid email or password.';
-  if (normalized.includes('email not confirmed')) return 'Please confirm your email before signing in.';
-  if (normalized.includes('network') || normalized.includes('fetch')) {
-    return 'Network error. Please check your connection and try again.';
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed?.message && typeof parsed.message === 'string') {
+      return parsed.message;
+    }
+  } catch {
+    // Keep raw message
   }
 
-  return rawMessage;
+  return raw;
 };
 
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(null);
+  const [token, setToken] = useState(() => getAccessToken());
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const resolveUserProfile = useCallback(async (authUser) => {
-    if (!authUser) return null;
-
-    const fallback = mapUser(authUser);
-
-    // Temporary safety switch: avoid profile table lookups when RLS policies are unstable.
-    // Set VITE_AUTH_USE_DB_PROFILE=true only after fixing recursive policies in Supabase.
-    const useDbProfile = import.meta.env.VITE_AUTH_USE_DB_PROFILE === 'true';
-    if (!useDbProfile) return fallback;
-
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, email, username, role')
-        .eq('id', authUser.id)
-        .maybeSingle();
-
-      if (error) {
-        if (
-          typeof error.message === 'string' &&
-          error.message.toLowerCase().includes('infinite recursion detected in policy')
-        ) {
-          console.warn('[Auth] Skipping DB profile due to recursive RLS policy. Using auth metadata fallback.');
-          return fallback;
-        }
-        console.error('[Auth] Failed to resolve user profile from public.users:', error);
-        return fallback;
-      }
-
-      if (!data) return fallback;
-
-      return {
-        ...fallback,
-        email: data.email ?? fallback.email,
-        username: data.username ?? fallback.username,
-        name: data.username ?? fallback.name,
-        role: data.role ?? fallback.role,
-      };
-    } catch (error) {
-      console.error('[Auth] Unexpected error while resolving profile:', error);
-      return fallback;
-    }
+  const clearSession = useCallback(() => {
+    clearAuthTokens();
+    setToken(null);
+    setUser(null);
   }, []);
+
+  const doRefresh = useCallback(async () => {
+    const storedRefreshToken = getRefreshToken();
+    if (!storedRefreshToken) {
+      clearSession();
+      return null;
+    }
+
+    if (isRefreshing) {
+      return getAccessToken();
+    }
+
+    setIsRefreshing(true);
+    try {
+      const nextSession = await refreshApi({ refreshToken: storedRefreshToken });
+      setAuthTokens({
+        accessToken: nextSession.accessToken,
+        refreshToken: nextSession.refreshToken,
+      });
+      setToken(nextSession.accessToken);
+      setUser(normalizeUser(nextSession.user));
+      return nextSession.accessToken;
+    } catch (error) {
+      console.error('[Auth] Token refresh failed:', error);
+      clearSession();
+      return null;
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [clearSession, isRefreshing]);
+
+  const refreshMe = useCallback(async (activeToken) => {
+    if (!activeToken) {
+      setUser(null);
+      return;
+    }
+
+    const me = await getMe();
+    if (!me?.isAuthenticated || !me?.user) {
+      clearSession();
+      return;
+    }
+
+    setUser(normalizeUser(me.user));
+  }, [clearSession]);
 
   useEffect(() => {
     let mounted = true;
 
-    const initSession = async () => {
+    const init = async () => {
       try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error('[Auth] Failed to get session:', error);
+        if (!token) {
+          if (mounted) setUser(null);
           return;
         }
 
-        if (!mounted) return;
-        const nextSession = data.session ?? null;
-        setSession(nextSession);
-        const resolvedUser = await resolveUserProfile(nextSession?.user ?? null);
-        if (mounted) setUser(resolvedUser);
+        await refreshMe(token);
       } catch (error) {
-        console.error('[Auth] Unexpected error while restoring session:', error);
+        console.error('[Auth] Session restore failed:', error);
+        if (mounted) {
+          clearSession();
+        }
       } finally {
         if (mounted) setLoading(false);
       }
     };
 
-    initSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
-      setSession(nextSession ?? null);
-      const resolvedUser = await resolveUserProfile(nextSession?.user ?? null);
-      setUser(resolvedUser);
-      setLoading(false);
-      console.log('[Auth] State changed:', event);
-    });
+    init();
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
     };
-  }, [resolveUserProfile]);
+  }, [token, refreshMe, clearSession]);
+
+  useEffect(() => {
+    configureAuthHttp({
+      onRefreshToken: doRefresh,
+      onUnauthorized: clearSession,
+    });
+
+    return () => {
+      configureAuthHttp({ onRefreshToken: null, onUnauthorized: null });
+    };
+  }, [doRefresh, clearSession]);
 
   const login = useCallback(async (email, password) => {
     const normalizedEmail = (email ?? '').trim().toLowerCase();
@@ -128,12 +163,14 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
-        password,
+      const session = await loginApi({ email: normalizedEmail, password });
+      setAuthTokens({
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
       });
-      if (error) throw error;
-      return data;
+      setToken(session.accessToken);
+      setUser(normalizeUser(session.user));
+      return session;
     } catch (error) {
       console.error('[Auth] Login failed:', error);
       throw new Error(getAuthErrorMessage(error, 'Unable to login. Please try again.'));
@@ -142,57 +179,31 @@ export function AuthProvider({ children }) {
 
   const register = useCallback(async (email, password, username) => {
     const normalizedEmail = (email ?? '').trim().toLowerCase();
-    if (!normalizedEmail || !password) {
-      throw new Error('Email and password are required.');
+    if (!normalizedEmail || !password || !username?.trim()) {
+      throw new Error('Email, password, and username are required.');
     }
 
-    const buildUsername = (value, withSuffix = false) => {
-      const base = (value ?? '')
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, '_')
-        .replace(/[^a-z0-9_]/g, '') || normalizedEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '');
-
-      const safeBase = base || `user_${Math.random().toString(36).slice(2, 7)}`;
-
-      if (!withSuffix) return safeBase;
-      return `${safeBase}_${Math.random().toString(36).slice(2, 7)}`;
-    };
-
-    const doSignUp = async (resolvedUsername) =>
-      supabase.auth.signUp({
+    try {
+      const result = await registerApi({
         email: normalizedEmail,
         password,
-        options: {
-          data: {
-            username: resolvedUsername,
-            name: resolvedUsername,
-            preferred_username: resolvedUsername,
-            role: 'student',
-          },
-        },
+        username: username.trim(),
       });
 
-    try {
-      const primaryUsername = buildUsername(username, false);
-      const { data, error } = await doSignUp(primaryUsername);
-      if (!error) return data;
-
-      const shouldRetryWithFallbackUsername =
-        error.status === 500 ||
-        error.code === 'unexpected_failure' ||
-        error.message?.includes('Database error saving new user') ||
-        error.message?.toLowerCase().includes('duplicate key');
-
-      if (shouldRetryWithFallbackUsername) {
-        const fallbackUsername = buildUsername(username, true);
-        console.warn('[Auth] Retrying registration with fallback username:', fallbackUsername);
-        const retry = await doSignUp(fallbackUsername);
-        if (retry.error) throw retry.error;
-        return retry.data;
+      if (result?.session?.accessToken) {
+        setAuthTokens({
+          accessToken: result.session.accessToken,
+          refreshToken: result.session.refreshToken,
+        });
+        setToken(result.session.accessToken);
+        setUser(normalizeUser(result.session.user));
       }
 
-      throw error;
+      return {
+        session: result?.session ?? null,
+        message: result?.message ?? '',
+        requiresEmailConfirmation: Boolean(result?.requiresEmailConfirmation),
+      };
     } catch (error) {
       console.error('[Auth] Registration failed:', error);
       throw new Error(getAuthErrorMessage(error, 'Unable to register. Please try again.'));
@@ -201,26 +212,26 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      await logoutApi({ scope: 'global' });
     } catch (error) {
-      console.error('[Auth] Logout failed:', error);
-      throw new Error(getAuthErrorMessage(error, 'Unable to logout. Please try again.'));
+      console.warn('[Auth] Logout endpoint failed, clearing local session anyway:', error);
+    } finally {
+      clearSession();
     }
-  }, []);
+  }, [clearSession]);
 
   const value = useMemo(
     () => ({
       user,
-      session,
+      session: token ? { accessToken: token } : null,
       loading,
-      isAuthenticated: Boolean(session),
+      isAuthenticated: Boolean(token && user),
       login,
       register,
       logout,
-      getHomePath: () => (user?.role === 'admin' ? '/admin/dashboard' : '/dashboard'),
+      getHomePath: () => (normalizeRole(user?.role) === 'admin' ? '/admin/dashboard' : '/dashboard'),
     }),
-    [user, session, loading, login, register, logout],
+    [user, token, loading, login, register, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
