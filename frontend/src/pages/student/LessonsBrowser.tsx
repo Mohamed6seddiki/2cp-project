@@ -5,11 +5,13 @@ import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import { getLessons, type LessonDto } from '../../api/lessonsApi';
+import { getAllLessonCompletions, type LessonCompletionDto } from '../../api/lessonCompletionApi';
 
 const LessonsBrowser = () => {
   const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [lessons, setLessons] = useState<LessonDto[]>([]);
+  const [lessonCompletions, setLessonCompletions] = useState<Record<string, LessonCompletionDto>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -20,8 +22,18 @@ const LessonsBrowser = () => {
       try {
         setLoading(true);
         setError('');
-        const data = await getLessons();
+        const [data, completions] = await Promise.all([
+          getLessons(),
+          getAllLessonCompletions().catch(() => [] as LessonCompletionDto[]),
+        ]);
+
         setLessons(data);
+        setLessonCompletions(
+          completions.reduce<Record<string, LessonCompletionDto>>((accumulator, completion) => {
+            accumulator[completion.lessonId] = completion;
+            return accumulator;
+          }, {}),
+        );
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load lessons.');
       } finally {
@@ -108,11 +120,16 @@ const LessonsBrowser = () => {
         {filteredLessons.map((lesson) => (
           <Card key={lesson.id} hoverable className="flex flex-col h-full overflow-hidden">
             <div className="p-6 flex-1 flex flex-col">
-              <div className="flex justify-between items-start mb-4">
-                <Badge variant={badgeByDifficulty[lesson.difficulty]}>
-                  {lesson.difficulty}
-                </Badge>
-              </div>
+                <div className="flex justify-between items-start mb-4">
+                  <Badge variant={badgeByDifficulty[lesson.difficulty]}>
+                    {lesson.difficulty}
+                  </Badge>
+                  {lessonCompletions[lesson.id] && (
+                    <Badge variant={lessonCompletions[lesson.id].isCompleted ? 'success' : 'warning'}>
+                      {lessonCompletions[lesson.id].progressPercent}%
+                    </Badge>
+                  )}
+                </div>
               
               <h3 className="text-xl font-bold mb-2 leading-tight">{lesson.title}</h3>
               <p className="text-text-muted text-sm mb-6 flex-1">{lesson.description}</p>

@@ -9,6 +9,7 @@ import {
   LineChart,
   Download,
   ListChecks,
+  Trophy,
   UserCircle,
   Settings,
   LogOut,
@@ -54,6 +55,7 @@ const Navbar: React.FC = () => {
     { name: 'Exercises', path: '/exercises', icon: ListChecks },
     { name: 'Practice', path: '/practice', icon: Code2 },
     { name: 'Progress', path: '/progress', icon: LineChart },
+    { name: 'Leaderboard', path: '/leaderboard', icon: Trophy },
     { name: 'Downloads', path: '/downloads', icon: Download },
   ];
 
