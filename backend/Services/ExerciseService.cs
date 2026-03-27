@@ -12,28 +12,24 @@ namespace backend.Services;
 public sealed class ExerciseService : IExerciseService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private readonly ISupabaseClientFactory _supabaseClientFactory;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly SupabaseOptions _supabaseOptions;
 
     public ExerciseService(
-        ISupabaseClientFactory supabaseClientFactory,
         IHttpClientFactory httpClientFactory,
         IOptions<SupabaseOptions> supabaseOptions)
     {
-        _supabaseClientFactory = supabaseClientFactory;
         _httpClientFactory = httpClientFactory;
         _supabaseOptions = supabaseOptions.Value;
     }
 
-    public async Task<IReadOnlyList<ExerciseDto>> GetGeneralExercisesAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ExerciseDto>> GetGeneralExercisesAsync(string? accessToken, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var client = await _supabaseClientFactory.GetClientAsync(cancellationToken);
-        var rows = await client.From<GeneralExerciseRow>().Get();
+        var rows = await GetGeneralExerciseRowsAsync(accessToken, cancellationToken);
 
-        var exercises = rows.Models
+        var exercises = rows
             .Select(row => new ExerciseDto
             {
                 Id = row.Id,
@@ -46,6 +42,20 @@ public sealed class ExerciseService : IExerciseService
             .ToList();
 
         return exercises;
+    }
+
+    public async Task<IReadOnlyList<GeneralExerciseRow>> GetGeneralExerciseRowsAsync(string? accessToken, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var client = CreateReadClient(accessToken);
+        var response = await client.GetAsync(
+            "/rest/v1/general_exercises?select=id,title,description,difficulty,points,created_at&order=created_at.asc",
+            cancellationToken);
+        var payload = await response.Content.ReadAsStringAsync(cancellationToken);
+        EnsureReadSuccess(response.StatusCode, payload);
+
+        return JsonSerializer.Deserialize<List<GeneralExerciseRow>>(payload, JsonOptions) ?? [];
     }
 
     public async Task<ExerciseSubmissionDto> SubmitGeneralExerciseAsync(
@@ -78,7 +88,7 @@ public sealed class ExerciseService : IExerciseService
             throw new ApiException(StatusCodes.Status400BadRequest, "validation_failed", "Score must be greater than or equal to 0.");
         }
 
-        var maxPoints = await GetGeneralExerciseMaxPointsAsync(normalizedExerciseId, cancellationToken);
+        var maxPoints = await GetGeneralExerciseMaxPointsAsync(accessToken, normalizedExerciseId, cancellationToken);
         if (maxPoints is null)
         {
             throw new ApiException(StatusCodes.Status404NotFound, "exercise_not_found", $"Exercise '{normalizedExerciseId}' was not found.");
@@ -131,7 +141,7 @@ public sealed class ExerciseService : IExerciseService
             throw new ApiException(StatusCodes.Status400BadRequest, "validation_failed", "Score must be greater than or equal to 0.");
         }
 
-        var maxPoints = await GetLessonExerciseMaxPointsAsync(normalizedExerciseId, cancellationToken);
+        var maxPoints = await GetLessonExerciseMaxPointsAsync(accessToken, normalizedExerciseId, cancellationToken);
         if (maxPoints is null)
         {
             throw new ApiException(StatusCodes.Status404NotFound, "lesson_exercise_not_found", $"Lesson exercise '{normalizedExerciseId}' was not found.");
@@ -154,26 +164,34 @@ public sealed class ExerciseService : IExerciseService
         };
     }
 
-    private async Task<int?> GetGeneralExerciseMaxPointsAsync(string exerciseId, CancellationToken cancellationToken)
+    private async Task<int?> GetGeneralExerciseMaxPointsAsync(string accessToken, string exerciseId, CancellationToken cancellationToken)
     {
-        var client = await _supabaseClientFactory.GetClientAsync(cancellationToken);
-        var rows = await client
-            .From<GeneralExerciseRow>()
-            .Where(x => x.Id == exerciseId)
-            .Get();
+        var client = CreateAuthenticatedClient(accessToken);
+        var encodedExerciseId = Uri.EscapeDataString(exerciseId);
+        var response = await client.GetAsync(
+            $"/rest/v1/general_exercises?id=eq.{encodedExerciseId}&select=points&limit=1",
+            cancellationToken);
 
-        return rows.Models.FirstOrDefault()?.Points;
+        var payload = await response.Content.ReadAsStringAsync(cancellationToken);
+        EnsureReadSuccess(response.StatusCode, payload);
+
+        var rows = JsonSerializer.Deserialize<List<ExercisePointsRow>>(payload, JsonOptions);
+        return rows?.FirstOrDefault()?.Points;
     }
 
-    private async Task<int?> GetLessonExerciseMaxPointsAsync(string exerciseId, CancellationToken cancellationToken)
+    private async Task<int?> GetLessonExerciseMaxPointsAsync(string accessToken, string exerciseId, CancellationToken cancellationToken)
     {
-        var client = await _supabaseClientFactory.GetClientAsync(cancellationToken);
-        var rows = await client
-            .From<LessonExerciseRow>()
-            .Where(x => x.Id == exerciseId)
-            .Get();
+        var client = CreateAuthenticatedClient(accessToken);
+        var encodedExerciseId = Uri.EscapeDataString(exerciseId);
+        var response = await client.GetAsync(
+            $"/rest/v1/lesson_exercises?id=eq.{encodedExerciseId}&select=points&limit=1",
+            cancellationToken);
 
-        return rows.Models.FirstOrDefault()?.Points;
+        var payload = await response.Content.ReadAsStringAsync(cancellationToken);
+        EnsureReadSuccess(response.StatusCode, payload);
+
+        var rows = JsonSerializer.Deserialize<List<ExercisePointsRow>>(payload, JsonOptions);
+        return rows?.FirstOrDefault()?.Points;
     }
 
     private async Task<StudentGeneralExerciseSubmissionRow> SubmitGeneralExerciseRpcAsync(
@@ -224,6 +242,24 @@ public sealed class ExerciseService : IExerciseService
 
     private HttpClient CreateRpcClient(string accessToken)
     {
+        return CreateAuthenticatedClient(accessToken);
+    }
+
+    private HttpClient CreateReadClient(string? accessToken)
+    {
+        var token = string.IsNullOrWhiteSpace(accessToken)
+            ? _supabaseOptions.ServiceKey
+            : accessToken.Trim();
+
+        var client = _httpClientFactory.CreateClient();
+        client.BaseAddress = new Uri(_supabaseOptions.Url.TrimEnd('/'));
+        client.DefaultRequestHeaders.Add("apikey", _supabaseOptions.ServiceKey);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return client;
+    }
+
+    private HttpClient CreateAuthenticatedClient(string accessToken)
+    {
         var client = _httpClientFactory.CreateClient();
         client.BaseAddress = new Uri(_supabaseOptions.Url.TrimEnd('/'));
         client.DefaultRequestHeaders.Add("apikey", _supabaseOptions.ServiceKey);
@@ -238,11 +274,36 @@ public sealed class ExerciseService : IExerciseService
             return;
         }
 
+        if (statusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+        {
+            throw new ApiException(StatusCodes.Status401Unauthorized, "unauthorized", "Authentication token is invalid.");
+        }
+
         var mappedMessage = statusCode == System.Net.HttpStatusCode.NotFound
             ? "Requested resource was not found."
             : "Exercise submission failed.";
 
         throw new ApiException(StatusCodes.Status502BadGateway, "submission_failed", mappedMessage);
+    }
+
+    private static void EnsureReadSuccess(System.Net.HttpStatusCode statusCode, string payload)
+    {
+        if ((int)statusCode is >= 200 and < 300)
+        {
+            return;
+        }
+
+        if (statusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+        {
+            throw new ApiException(StatusCodes.Status401Unauthorized, "unauthorized", "Authentication token is invalid.");
+        }
+
+        throw new ApiException(StatusCodes.Status502BadGateway, "exercise_lookup_failed", "Failed to read exercise details.");
+    }
+
+    private sealed class ExercisePointsRow
+    {
+        public int Points { get; set; }
     }
 
     private static string MapDifficulty(string value)

@@ -157,6 +157,29 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
 -- ============================================================
+-- ROLE HELPER
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.is_admin(p_user_id UUID DEFAULT auth.uid())
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.admins a
+    WHERE a.id = COALESCE(p_user_id, auth.uid())
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.is_admin(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_admin(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_admin(UUID) TO anon;
+GRANT EXECUTE ON FUNCTION public.is_admin(UUID) TO service_role;
+
+-- ============================================================
 -- ADMIN FUNCTIONS
 -- ============================================================
 
@@ -171,7 +194,7 @@ LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 DECLARE v_lesson lessons;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()) THEN
+  IF NOT public.is_admin(auth.uid()) THEN
     RAISE EXCEPTION 'Access denied: admin only';
   END IF;
   INSERT INTO lessons (title, content, difficulty, order_index)
@@ -186,7 +209,7 @@ RETURNS BOOLEAN
 LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()) THEN
+  IF NOT public.is_admin(auth.uid()) THEN
     RAISE EXCEPTION 'Access denied: admin only';
   END IF;
   DELETE FROM lessons WHERE id = p_lesson_id;
@@ -206,7 +229,7 @@ LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 DECLARE v_lesson lessons;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()) THEN
+  IF NOT public.is_admin(auth.uid()) THEN
     RAISE EXCEPTION 'Access denied: admin only';
   END IF;
   UPDATE lessons SET
@@ -231,7 +254,7 @@ LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 DECLARE v_exercise lesson_exercises;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()) THEN
+  IF NOT public.is_admin(auth.uid()) THEN
     RAISE EXCEPTION 'Access denied: admin only';
   END IF;
   INSERT INTO lesson_exercises (lesson_id, title, description, points)
@@ -246,7 +269,7 @@ RETURNS BOOLEAN
 LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()) THEN
+  IF NOT public.is_admin(auth.uid()) THEN
     RAISE EXCEPTION 'Access denied: admin only';
   END IF;
   DELETE FROM lesson_exercises WHERE id = p_exercise_id;
@@ -265,7 +288,7 @@ LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 DECLARE v_exercise general_exercises;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()) THEN
+  IF NOT public.is_admin(auth.uid()) THEN
     RAISE EXCEPTION 'Access denied: admin only';
   END IF;
   INSERT INTO general_exercises (title, description, difficulty, points)
@@ -280,7 +303,7 @@ RETURNS BOOLEAN
 LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()) THEN
+  IF NOT public.is_admin(auth.uid()) THEN
     RAISE EXCEPTION 'Access denied: admin only';
   END IF;
   DELETE FROM general_exercises WHERE id = p_exercise_id;
@@ -294,7 +317,7 @@ LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 DECLARE v_old_role user_role;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()) THEN
+  IF NOT public.is_admin(auth.uid()) THEN
     RAISE EXCEPTION 'Access denied: admin only';
   END IF;
   SELECT role INTO v_old_role FROM users WHERE id = p_user_id;
@@ -387,7 +410,7 @@ DECLARE
   v_result     JSON;
 BEGIN
   v_student_id := COALESCE(p_student_id, auth.uid());
-  IF v_student_id <> auth.uid() AND NOT EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()) THEN
+  IF v_student_id <> auth.uid() AND NOT public.is_admin(auth.uid()) THEN
     RAISE EXCEPTION 'Access denied';
   END IF;
   SELECT json_build_object(
@@ -422,6 +445,84 @@ BEGIN
   RETURN v_result;
 END;
 $$;
+
+CREATE OR REPLACE FUNCTION get_leaderboard_snapshot(p_limit INT DEFAULT 100)
+RETURNS TABLE (
+  student_id UUID,
+  username TEXT,
+  total_score INT,
+  solved_count INT,
+  activity_days TEXT[]
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Authentication required';
+  END IF;
+
+  RETURN QUERY
+  WITH solved AS (
+    SELECT
+      s.id AS student_id,
+      COALESCE(ls.solved_count, 0) + COALESCE(gs.solved_count, 0) AS solved_count
+    FROM students s
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*)::INT AS solved_count
+      FROM student_lesson_exercises sle
+      WHERE sle.student_id = s.id
+        AND sle.completed = TRUE
+    ) ls ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*)::INT AS solved_count
+      FROM student_general_exercises sge
+      WHERE sge.student_id = s.id
+        AND sge.completed = TRUE
+    ) gs ON TRUE
+  ),
+  activity AS (
+    SELECT
+      s.id AS student_id,
+      COALESCE(
+        ARRAY_AGG(DISTINCT d.day_text ORDER BY d.day_text),
+        ARRAY[]::TEXT[]
+      ) AS activity_days
+    FROM students s
+    LEFT JOIN LATERAL (
+      SELECT TO_CHAR((sle.submitted_at AT TIME ZONE 'UTC')::DATE, 'YYYY-MM-DD') AS day_text
+      FROM student_lesson_exercises sle
+      WHERE sle.student_id = s.id
+        AND sle.completed = TRUE
+      UNION
+      SELECT TO_CHAR((sge.submitted_at AT TIME ZONE 'UTC')::DATE, 'YYYY-MM-DD') AS day_text
+      FROM student_general_exercises sge
+      WHERE sge.student_id = s.id
+        AND sge.completed = TRUE
+    ) d ON TRUE
+    GROUP BY s.id
+  )
+  SELECT
+    s.id AS student_id,
+    u.username,
+    s.total_score,
+    COALESCE(sol.solved_count, 0) AS solved_count,
+    COALESCE(act.activity_days, ARRAY[]::TEXT[]) AS activity_days
+  FROM students s
+  JOIN users u ON u.id = s.id
+  LEFT JOIN solved sol ON sol.student_id = s.id
+  LEFT JOIN activity act ON act.student_id = s.id
+  WHERE u.role = 'student'
+  ORDER BY s.total_score DESC, COALESCE(sol.solved_count, 0) DESC, u.username ASC
+  LIMIT GREATEST(1, LEAST(COALESCE(p_limit, 100), 500));
+END;
+$$;
+
+REVOKE ALL ON FUNCTION get_leaderboard_snapshot(INT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION get_leaderboard_snapshot(INT) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_leaderboard_snapshot(INT) TO service_role;
 
 -- ============================================================
 -- EVALUATE & CALCULATE SCORE FUNCTIONS
@@ -468,6 +569,7 @@ ALTER TABLE student_general_exercises ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "users_self"              ON users;
 DROP POLICY IF EXISTS "admins_self"             ON admins;
+DROP POLICY IF EXISTS "admins_policy"           ON admins;
 DROP POLICY IF EXISTS "students_self"           ON students;
 DROP POLICY IF EXISTS "lessons_read"            ON lessons;
 DROP POLICY IF EXISTS "lessons_write"           ON lessons;
@@ -488,58 +590,66 @@ DROP POLICY IF EXISTS "sle_policy"              ON student_lesson_exercises;
 DROP POLICY IF EXISTS "sge_policy"              ON student_general_exercises;
 
 CREATE POLICY "users_self" ON users
-  FOR ALL USING (auth.uid() = id OR EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+  FOR ALL
+  USING (auth.uid() = id OR public.is_admin(auth.uid()))
+  WITH CHECK (auth.uid() = id OR public.is_admin(auth.uid()));
 
 CREATE POLICY "admins_self" ON admins
   FOR SELECT USING (auth.uid() = id);
 
 CREATE POLICY "students_self" ON students
-  FOR ALL USING (auth.uid() = id OR EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+  FOR ALL
+  USING (auth.uid() = id OR public.is_admin(auth.uid()))
+  WITH CHECK (auth.uid() = id OR public.is_admin(auth.uid()));
 
 CREATE POLICY "lessons_read" ON lessons
   FOR SELECT USING (auth.role() = 'authenticated');
 
 CREATE POLICY "lessons_insert" ON lessons
-  FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+  FOR INSERT WITH CHECK (public.is_admin(auth.uid()));
 
 CREATE POLICY "lessons_update" ON lessons
   FOR UPDATE
-  USING (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()))
-  WITH CHECK (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+  USING (public.is_admin(auth.uid()))
+  WITH CHECK (public.is_admin(auth.uid()));
 
 CREATE POLICY "lessons_delete" ON lessons
-  FOR DELETE USING (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+  FOR DELETE USING (public.is_admin(auth.uid()));
 
 CREATE POLICY "lesson_exercises_read" ON lesson_exercises
   FOR SELECT USING (auth.role() = 'authenticated');
 
 CREATE POLICY "lesson_exercises_insert" ON lesson_exercises
-  FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+  FOR INSERT WITH CHECK (public.is_admin(auth.uid()));
 
 CREATE POLICY "lesson_exercises_update" ON lesson_exercises
   FOR UPDATE
-  USING (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()))
-  WITH CHECK (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+  USING (public.is_admin(auth.uid()))
+  WITH CHECK (public.is_admin(auth.uid()));
 
 CREATE POLICY "lesson_exercises_delete" ON lesson_exercises
-  FOR DELETE USING (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+  FOR DELETE USING (public.is_admin(auth.uid()));
 
 CREATE POLICY "general_exercises_read" ON general_exercises
   FOR SELECT USING (auth.role() = 'authenticated');
 
 CREATE POLICY "general_exercises_insert" ON general_exercises
-  FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+  FOR INSERT WITH CHECK (public.is_admin(auth.uid()));
 
 CREATE POLICY "general_exercises_update" ON general_exercises
   FOR UPDATE
-  USING (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()))
-  WITH CHECK (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+  USING (public.is_admin(auth.uid()))
+  WITH CHECK (public.is_admin(auth.uid()));
 
 CREATE POLICY "general_exercises_delete" ON general_exercises
-  FOR DELETE USING (EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+  FOR DELETE USING (public.is_admin(auth.uid()));
 
 CREATE POLICY "sle_policy" ON student_lesson_exercises
-  FOR ALL USING (student_id = auth.uid() OR EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+  FOR ALL
+  USING (student_id = auth.uid() OR public.is_admin(auth.uid()))
+  WITH CHECK (student_id = auth.uid() OR public.is_admin(auth.uid()));
 
 CREATE POLICY "sge_policy" ON student_general_exercises
-  FOR ALL USING (student_id = auth.uid() OR EXISTS (SELECT 1 FROM admins WHERE id = auth.uid()));
+  FOR ALL
+  USING (student_id = auth.uid() OR public.is_admin(auth.uid()))
+  WITH CHECK (student_id = auth.uid() OR public.is_admin(auth.uid()));

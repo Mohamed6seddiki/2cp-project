@@ -13,20 +13,18 @@ namespace backend.Services;
 
 public sealed class AuthService : IAuthService
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly SupabaseOptions _supabaseOptions;
-    private readonly ISupabaseClientFactory _supabaseClientFactory;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
         IHttpClientFactory httpClientFactory,
         IOptions<SupabaseOptions> supabaseOptions,
-        ISupabaseClientFactory supabaseClientFactory,
         ILogger<AuthService> logger)
     {
         _httpClientFactory = httpClientFactory;
         _supabaseOptions = supabaseOptions.Value;
-        _supabaseClientFactory = supabaseClientFactory;
         _logger = logger;
     }
 
@@ -151,7 +149,10 @@ public sealed class AuthService : IAuthService
         };
     }
 
-    public async Task<AuthMeResponseDto> GetMeAsync(ClaimsPrincipal principal, CancellationToken cancellationToken = default)
+    public async Task<AuthMeResponseDto> GetMeAsync(
+        ClaimsPrincipal principal,
+        string? accessToken,
+        CancellationToken cancellationToken = default)
     {
         if (principal.Identity?.IsAuthenticated != true)
         {
@@ -170,15 +171,12 @@ public sealed class AuthService : IAuthService
         }
 
         var email = principal.FindFirst("email")?.Value ?? string.Empty;
-        var profile = await TryGetUserProfileAsync(userId, cancellationToken);
+        var profile = await TryGetUserProfileAsync(userId, accessToken, cancellationToken);
         var username = profile?.Username
             ?? principal.FindFirst("app_username")?.Value
             ?? principal.FindFirst("preferred_username")?.Value
             ?? BuildUsernameFromEmail(email);
-        var role = profile?.Role
-            ?? principal.FindFirst("app_role")?.Value
-            ?? principal.FindFirst(ClaimTypes.Role)?.Value
-            ?? "student";
+        var role = ResolveRole(profile?.Role, principal);
 
         return new AuthMeResponseDto
         {
@@ -232,12 +230,12 @@ public sealed class AuthService : IAuthService
         UserProfileRow? profile = null;
         if (!string.IsNullOrWhiteSpace(userId))
         {
-            profile = await TryGetUserProfileAsync(userId, cancellationToken);
+            profile = await TryGetUserProfileAsync(userId, accessToken, cancellationToken);
         }
 
         var finalEmail = profile?.Email ?? email ?? string.Empty;
         var finalUsername = profile?.Username ?? metaUsername ?? BuildUsernameFromEmail(finalEmail);
-        var finalRole = profile?.Role ?? metaRole ?? "student";
+        var finalRole = NormalizeRole(profile?.Role) ?? NormalizeRole(metaRole) ?? "student";
 
         return new AuthSessionDto
         {
@@ -256,23 +254,51 @@ public sealed class AuthService : IAuthService
         };
     }
 
-    private async Task<UserProfileRow?> TryGetUserProfileAsync(string userId, CancellationToken cancellationToken)
+    private async Task<UserProfileRow?> TryGetUserProfileAsync(
+        string userId,
+        string? accessToken,
+        CancellationToken cancellationToken)
     {
         try
         {
-            var client = await _supabaseClientFactory.GetClientAsync(cancellationToken);
-            var response = await client
-                .From<UserProfileRow>()
-                .Where(x => x.Id == userId)
-                .Get();
+            var client = CreateRestHttpClient(accessToken);
+            var encodedUserId = Uri.EscapeDataString(userId);
+            var response = await client.GetAsync(
+                $"/rest/v1/users?id=eq.{encodedUserId}&select=id,email,username,role&limit=1",
+                cancellationToken);
 
-            return response.Models.FirstOrDefault();
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "Failed to resolve user profile from users table for user {UserId}. Status: {StatusCode}",
+                    userId,
+                    (int)response.StatusCode);
+                return null;
+            }
+
+            var payload = await response.Content.ReadAsStringAsync(cancellationToken);
+            var users = JsonSerializer.Deserialize<List<UserProfileRow>>(payload, JsonOptions);
+            return users?.FirstOrDefault();
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to resolve user profile from users table for user {UserId}", userId);
             return null;
         }
+    }
+
+    private HttpClient CreateRestHttpClient(string? accessToken)
+    {
+        var token = string.IsNullOrWhiteSpace(accessToken)
+            ? _supabaseOptions.ServiceKey
+            : accessToken.Trim();
+
+        var client = _httpClientFactory.CreateClient();
+        client.BaseAddress = new Uri(_supabaseOptions.Url.TrimEnd('/'));
+        client.DefaultRequestHeaders.Add("apikey", _supabaseOptions.ServiceKey);
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+        return client;
     }
 
     private static void EnsureSuccess(HttpStatusCode statusCode, string payload)
@@ -357,6 +383,67 @@ public sealed class AuthService : IAuthService
         var username = TryGetString(metadata, "username") ?? TryGetString(metadata, "preferred_username");
         var role = TryGetString(metadata, "role");
         return (username, role);
+    }
+
+    private static string ResolveRole(string? profileRole, ClaimsPrincipal principal)
+    {
+        var candidates = new[]
+        {
+            profileRole,
+            principal.FindFirst("app_role")?.Value,
+            principal.FindFirst("user_role")?.Value,
+            ExtractRoleFromJsonClaim(principal, "user_metadata"),
+            ExtractRoleFromJsonClaim(principal, "app_metadata"),
+            principal.FindFirst("role")?.Value,
+            principal.FindFirst(ClaimTypes.Role)?.Value
+        };
+
+        foreach (var candidate in candidates)
+        {
+            var normalizedRole = NormalizeRole(candidate);
+            if (normalizedRole is not null)
+            {
+                return normalizedRole;
+            }
+        }
+
+        return "student";
+    }
+
+    private static string? ExtractRoleFromJsonClaim(ClaimsPrincipal principal, string claimName)
+    {
+        var rawJson = principal.FindFirst(claimName)?.Value;
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(rawJson);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            return TryGetString(root, "role");
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? NormalizeRole(string? role)
+    {
+        if (string.IsNullOrWhiteSpace(role))
+        {
+            return null;
+        }
+
+        var normalized = role.Trim().ToLowerInvariant();
+        return normalized is "admin" or "student" ? normalized : null;
     }
 
     private static string? TryGetString(JsonElement element, string propertyName)

@@ -13,5 +13,5 @@ public interface IAuthService
 
     Task<AuthLogoutResponseDto> LogoutAsync(string accessToken, AuthLogoutRequestDto request, CancellationToken cancellationToken = default);
 
-    Task<AuthMeResponseDto> GetMeAsync(ClaimsPrincipal principal, CancellationToken cancellationToken = default);
+    Task<AuthMeResponseDto> GetMeAsync(ClaimsPrincipal principal, string? accessToken, CancellationToken cancellationToken = default);
 }

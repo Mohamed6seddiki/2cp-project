@@ -53,6 +53,12 @@ builder.Services.AddScoped<IExerciseService, ExerciseService>();
 builder.Services.AddScoped<ICodeExecutionService, CodeExecutionService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IProgressService, ProgressService>();
+builder.Services.AddScoped<IStudentDashboardService, StudentDashboardService>();
+builder.Services.AddScoped<ILeaderboardService, LeaderboardService>();
+builder.Services.AddScoped<ILessonCompletionService, LessonCompletionService>();
+builder.Services.AddScoped<IAdminLessonService, AdminLessonService>();
+builder.Services.AddScoped<IAdminExerciseService, AdminExerciseService>();
+builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddScoped<IClaimsTransformation, AppUserClaimsTransformation>();
 builder.Services.AddHttpClient();
 
@@ -138,12 +144,34 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+
+var configuredCorsOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>()?
+    .Select(origin => (origin ?? string.Empty).Trim().TrimEnd('/'))
+    .Where(origin =>
+        !string.IsNullOrWhiteSpace(origin)
+        && Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+        && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray()
+    ?? [];
+
+if (configuredCorsOrigins.Length == 0)
+{
+    configuredCorsOrigins =
+    [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+    ];
+}
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendDev", policy =>
     {
         policy
-            .WithOrigins("http://localhost:5173", "http://127.0.0.1:5173")
+            .WithOrigins(configuredCorsOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod();
     });

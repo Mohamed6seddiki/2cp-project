@@ -1,27 +1,41 @@
 using backend.DTOs;
 using backend.Models;
+using backend.Middleware;
 using backend.Supabase;
-using Supabase.Postgrest.Exceptions;
+using Microsoft.Extensions.Options;
+using System.Net.Http.Headers;
+using System.Text.Json;
 
 namespace backend.Services;
 
 public sealed class LessonService : ILessonService
 {
-    private readonly ISupabaseClientFactory _supabaseClientFactory;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly SupabaseOptions _supabaseOptions;
 
-    public LessonService(ISupabaseClientFactory supabaseClientFactory)
+    public LessonService(
+        IHttpClientFactory httpClientFactory,
+        IOptions<SupabaseOptions> supabaseOptions)
     {
-        _supabaseClientFactory = supabaseClientFactory;
+        _httpClientFactory = httpClientFactory;
+        _supabaseOptions = supabaseOptions.Value;
     }
 
-    public async Task<IReadOnlyList<LessonDto>> GetLessonsAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<LessonDto>> GetLessonsAsync(string? accessToken, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var client = await _supabaseClientFactory.GetClientAsync(cancellationToken);
-        var lessonRows = await client.From<LessonRow>().Get();
+        var client = CreateReadClient(accessToken);
+        var response = await client.GetAsync(
+            "/rest/v1/lessons?select=id,title,content,difficulty,order_index&order=order_index.asc",
+            cancellationToken);
+        var payload = await response.Content.ReadAsStringAsync(cancellationToken);
+        EnsureReadSuccess(response.StatusCode, payload);
 
-        var items = lessonRows.Models
+        var lessonRows = JsonSerializer.Deserialize<List<LessonRow>>(payload, JsonOptions) ?? [];
+
+        var items = lessonRows
             .OrderBy(x => x.OrderIndex)
             .Select(MapLesson)
             .ToList();
@@ -29,7 +43,7 @@ public sealed class LessonService : ILessonService
         return items;
     }
 
-    public async Task<LessonDetailDto?> GetLessonByIdAsync(string lessonId, CancellationToken cancellationToken = default)
+    public async Task<LessonDetailDto?> GetLessonByIdAsync(string lessonId, string? accessToken, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -38,30 +52,30 @@ public sealed class LessonService : ILessonService
             return null;
         }
 
-        var client = await _supabaseClientFactory.GetClientAsync(cancellationToken);
+        var normalizedLessonId = lessonId.Trim();
+        var encodedLessonId = Uri.EscapeDataString(normalizedLessonId);
+        var client = CreateReadClient(accessToken);
 
-        LessonRow? lesson;
-        try
-        {
-            lesson = await client
-                .From<LessonRow>()
-                .Where(x => x.Id == lessonId)
-                .Single();
-        }
-        catch (PostgrestException ex) when (ex.Response?.StatusCode == System.Net.HttpStatusCode.NotFound)
-        {
-            return null;
-        }
+        var lessonResponse = await client.GetAsync(
+            $"/rest/v1/lessons?id=eq.{encodedLessonId}&select=id,title,content,difficulty,order_index&limit=1",
+            cancellationToken);
+        var lessonPayload = await lessonResponse.Content.ReadAsStringAsync(cancellationToken);
+        EnsureReadSuccess(lessonResponse.StatusCode, lessonPayload);
+
+        var lessonList = JsonSerializer.Deserialize<List<LessonRow>>(lessonPayload, JsonOptions);
+        var lesson = lessonList?.FirstOrDefault();
 
         if (lesson is null)
         {
             return null;
         }
 
-        var exerciseRows = await client
-            .From<LessonExerciseRow>()
-            .Where(x => x.LessonId == lessonId)
-            .Get();
+        var exerciseResponse = await client.GetAsync(
+            $"/rest/v1/lesson_exercises?lesson_id=eq.{encodedLessonId}&select=id,lesson_id,title,description,points&order=created_at.asc",
+            cancellationToken);
+        var exercisePayload = await exerciseResponse.Content.ReadAsStringAsync(cancellationToken);
+        EnsureReadSuccess(exerciseResponse.StatusCode, exercisePayload);
+        var exerciseRows = JsonSerializer.Deserialize<List<LessonExerciseRow>>(exercisePayload, JsonOptions) ?? [];
 
         var lessonDetail = new LessonDetailDto
         {
@@ -72,12 +86,40 @@ public sealed class LessonService : ILessonService
             EstimatedMinutes = EstimateMinutes(lesson.Content),
             OrderIndex = lesson.OrderIndex,
             Content = lesson.Content,
-            Exercises = exerciseRows.Models
+            Exercises = exerciseRows
                 .Select(MapLessonExercise)
                 .ToList()
         };
 
         return lessonDetail;
+    }
+
+    private HttpClient CreateReadClient(string? accessToken)
+    {
+        var token = string.IsNullOrWhiteSpace(accessToken)
+            ? _supabaseOptions.ServiceKey
+            : accessToken.Trim();
+
+        var client = _httpClientFactory.CreateClient();
+        client.BaseAddress = new Uri(_supabaseOptions.Url.TrimEnd('/'));
+        client.DefaultRequestHeaders.Add("apikey", _supabaseOptions.ServiceKey);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return client;
+    }
+
+    private static void EnsureReadSuccess(System.Net.HttpStatusCode statusCode, string payload)
+    {
+        if ((int)statusCode is >= 200 and < 300)
+        {
+            return;
+        }
+
+        if (statusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+        {
+            throw new ApiException(StatusCodes.Status401Unauthorized, "unauthorized", "Authentication token is invalid.");
+        }
+
+        throw new ApiException(StatusCodes.Status502BadGateway, "lesson_fetch_failed", "Failed to load lessons from data provider.");
     }
 
     private static LessonDto MapLesson(LessonRow row)
