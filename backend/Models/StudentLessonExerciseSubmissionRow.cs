@@ -11,6 +11,10 @@ public sealed class StudentLessonExerciseSubmissionRow : BaseModel
     [JsonPropertyName("id")]
     public string Id { get; set; } = string.Empty;
 
+    [Column("student_id")]
+    [JsonPropertyName("student_id")]
+    public string StudentId { get; set; } = string.Empty;
+
     [Column("lesson_exercise_id")]
     [JsonPropertyName("lesson_exercise_id")]
     public string LessonExerciseId { get; set; } = string.Empty;

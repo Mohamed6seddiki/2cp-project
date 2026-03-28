@@ -93,7 +93,12 @@ public sealed class AuthController : ControllerBase
     [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<AuthMeResponseDto>> Me(CancellationToken cancellationToken)
     {
-        var me = await _authService.GetMeAsync(User, cancellationToken);
+        var authorization = Request.Headers.Authorization.ToString();
+        var accessToken = authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            ? authorization[7..].Trim()
+            : string.Empty;
+
+        var me = await _authService.GetMeAsync(User, accessToken, cancellationToken);
         return Ok(me);
     }
 }

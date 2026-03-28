@@ -1,10 +1,13 @@
 using backend.DTOs;
+using backend.Models;
 
 namespace backend.Services;
 
 public interface IExerciseService
 {
-    Task<IReadOnlyList<ExerciseDto>> GetGeneralExercisesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ExerciseDto>> GetGeneralExercisesAsync(string? accessToken, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<GeneralExerciseRow>> GetGeneralExerciseRowsAsync(string? accessToken, CancellationToken cancellationToken = default);
 
     Task<ExerciseSubmissionDto> SubmitGeneralExerciseAsync(
         string studentId,

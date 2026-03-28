@@ -25,7 +25,8 @@ public sealed class LessonsController : ControllerBase
     [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IReadOnlyList<LessonDto>>> GetLessons(CancellationToken cancellationToken)
     {
-        var lessons = await _lessonService.GetLessonsAsync(cancellationToken);
+        var accessToken = TryGetAccessToken();
+        var lessons = await _lessonService.GetLessonsAsync(accessToken, cancellationToken);
         return Ok(lessons);
     }
 
@@ -37,7 +38,8 @@ public sealed class LessonsController : ControllerBase
     [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<LessonDetailDto>> GetLessonById(string id, CancellationToken cancellationToken)
     {
-        var lesson = await _lessonService.GetLessonByIdAsync(id, cancellationToken);
+        var accessToken = TryGetAccessToken();
+        var lesson = await _lessonService.GetLessonByIdAsync(id, accessToken, cancellationToken);
         if (lesson is null)
         {
             return NotFound(new ApiErrorDto
@@ -50,5 +52,13 @@ public sealed class LessonsController : ControllerBase
         }
 
         return Ok(lesson);
+    }
+
+    private string TryGetAccessToken()
+    {
+        var authorization = Request.Headers.Authorization.ToString();
+        return authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            ? authorization[7..].Trim()
+            : string.Empty;
     }
 }

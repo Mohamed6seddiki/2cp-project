@@ -121,14 +121,14 @@ Phase 7 — Exercise Submission & Progress**************
 - Files:
   - Backend: backend/Controllers/ProgressController.cs (new), backend/Services/ProgressService.cs (new), extend ExercisesController
   - Frontend: frontend/src/services/exerciseService.js, frontend/src/api/progressApi.ts (new), frontend/src/pages/student/Progress.tsx
-Phase 8 — Admin Features (Production-ready)
+Phase 8 — Admin Features (Production-ready)*****************************
 - Build backend admin CRUD endpoints for lessons + exercises.
 - Connect admin pages to live APIs (currently mostly static/mock).
 - Add server-side role authorization on admin routes.
 - Files:
   - Backend: backend/Controllers/AdminLessonsController.cs (new), backend/Controllers/AdminExercisesController.cs (new), admin services
   - Frontend: frontend/src/pages/admin/ManageLessons.tsx, frontend/src/pages/admin/AddPractice.tsx, frontend/src/pages/admin/ManageUsers.tsx, frontend/src/api/adminApi.ts (new)
-Phase 9 — Student Product Completion
+Phase 9 — Student Product Completion*******************
 - Dashboard data endpoints (/api/dashboard/me for stats, streak, recent activity).
 - Lesson completion tracking.
 - Hook daily challenge and leaderboard to real data.

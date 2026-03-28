@@ -33,6 +33,24 @@ public sealed class ExceptionHandlingMiddleware
             _logger.LogWarning(ex, "Request failed with API exception");
             await WriteErrorResponseAsync(context, ex.StatusCode, ex.ErrorCode, ex.Message);
         }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Upstream HTTP request failed");
+            await WriteErrorResponseAsync(
+                context,
+                StatusCodes.Status503ServiceUnavailable,
+                "upstream_unavailable",
+                "A required upstream service is temporarily unavailable.");
+        }
+        catch (TaskCanceledException ex) when (!context.RequestAborted.IsCancellationRequested)
+        {
+            _logger.LogError(ex, "Upstream request timed out");
+            await WriteErrorResponseAsync(
+                context,
+                StatusCodes.Status504GatewayTimeout,
+                "upstream_timeout",
+                "A required upstream service did not respond in time.");
+        }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
         {
             _logger.LogWarning("Request was cancelled by the client");

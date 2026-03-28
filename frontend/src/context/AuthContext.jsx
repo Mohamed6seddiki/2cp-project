@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getMe,
   login as loginApi,
@@ -65,6 +65,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const sessionSyncRef = useRef(0);
 
   const clearSession = useCallback(() => {
     clearAuthTokens();
@@ -102,39 +103,38 @@ export function AuthProvider({ children }) {
     }
   }, [clearSession, isRefreshing]);
 
-  const refreshMe = useCallback(async (activeToken) => {
-    if (!activeToken) {
-      setUser(null);
-      return;
-    }
-
-    const me = await getMe();
-    if (!me?.isAuthenticated || !me?.user) {
-      clearSession();
-      return;
-    }
-
-    setUser(normalizeUser(me.user));
-  }, [clearSession]);
-
   useEffect(() => {
+    sessionSyncRef.current += 1;
+    const syncId = sessionSyncRef.current;
     let mounted = true;
+    const isCurrentSync = () => mounted && sessionSyncRef.current === syncId;
 
     const init = async () => {
       try {
         if (!token) {
-          if (mounted) setUser(null);
+          if (isCurrentSync()) setUser(null);
           return;
         }
 
-        await refreshMe(token);
+        const me = await getMe();
+
+        if (!isCurrentSync()) {
+          return;
+        }
+
+        if (!me?.isAuthenticated || !me?.user) {
+          clearSession();
+          return;
+        }
+
+        setUser(normalizeUser(me.user));
       } catch (error) {
         console.error('[Auth] Session restore failed:', error);
-        if (mounted) {
+        if (isCurrentSync()) {
           clearSession();
         }
       } finally {
-        if (mounted) setLoading(false);
+        if (isCurrentSync()) setLoading(false);
       }
     };
 
@@ -143,7 +143,7 @@ export function AuthProvider({ children }) {
     return () => {
       mounted = false;
     };
-  }, [token, refreshMe, clearSession]);
+  }, [token, clearSession]);
 
   useEffect(() => {
     configureAuthHttp({

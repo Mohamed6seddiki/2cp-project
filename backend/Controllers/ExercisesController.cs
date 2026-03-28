@@ -26,7 +26,8 @@ public sealed class ExercisesController : ControllerBase
     [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IReadOnlyList<ExerciseDto>>> GetGeneralExercises(CancellationToken cancellationToken)
     {
-        var exercises = await _exerciseService.GetGeneralExercisesAsync(cancellationToken);
+        var accessToken = TryGetAccessToken();
+        var exercises = await _exerciseService.GetGeneralExercisesAsync(accessToken, cancellationToken);
         return Ok(exercises);
     }
 
@@ -47,10 +48,7 @@ public sealed class ExercisesController : ControllerBase
         {
             studentId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         }
-        var authorization = Request.Headers.Authorization.ToString();
-        var accessToken = authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-            ? authorization[7..].Trim()
-            : string.Empty;
+        var accessToken = TryGetAccessToken();
 
         if (string.IsNullOrWhiteSpace(studentId))
         {
@@ -78,10 +76,7 @@ public sealed class ExercisesController : ControllerBase
         {
             studentId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         }
-        var authorization = Request.Headers.Authorization.ToString();
-        var accessToken = authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-            ? authorization[7..].Trim()
-            : string.Empty;
+        var accessToken = TryGetAccessToken();
 
         if (string.IsNullOrWhiteSpace(studentId))
         {
@@ -90,5 +85,13 @@ public sealed class ExercisesController : ControllerBase
 
         var submission = await _exerciseService.SubmitLessonExerciseAsync(studentId, accessToken, id, request.Score, cancellationToken);
         return Ok(submission);
+    }
+
+    private string TryGetAccessToken()
+    {
+        var authorization = Request.Headers.Authorization.ToString();
+        return authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            ? authorization[7..].Trim()
+            : string.Empty;
     }
 }
