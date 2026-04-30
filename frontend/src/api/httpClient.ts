@@ -2,6 +2,16 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim() || 'http://localh
 const ACCESS_TOKEN_STORAGE_KEY = 'algonova_access_token';
 const REFRESH_TOKEN_STORAGE_KEY = 'algonova_refresh_token';
 
+const API_HOSTNAME = (() => {
+  try {
+    return new URL(API_BASE_URL).hostname.toLowerCase();
+  } catch {
+    return '';
+  }
+})();
+
+const SHOULD_SKIP_NGROK_WARNING = API_HOSTNAME.includes('ngrok');
+
 type AuthTokens = {
   accessToken: string;
   refreshToken?: string | null;
@@ -68,6 +78,7 @@ async function executeRequest(path: string, options: RequestOptions, tokenOverri
       ...rest,
       headers: {
         'Content-Type': 'application/json',
+        ...(SHOULD_SKIP_NGROK_WARNING ? { 'ngrok-skip-browser-warning': 'true' } : {}),
         ...(!skipAuth && token ? { Authorization: `Bearer ${token}` } : {}),
         ...headers,
       },
