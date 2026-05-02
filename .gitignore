@@ -1,0 +1,12 @@
+# Ignore build folders
+[Bb]in/
+[Oo]bj/
+
+# Ignore Visual Studio temp files
+.vs/
+*.user
+*.suo
+
+# Ignore OS files
+Thumbs.db
+.DS_Store
