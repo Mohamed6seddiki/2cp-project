@@ -5,9 +5,9 @@ import Button from '../../components/ui/Button';
 
 const Downloads = () => {
   const myAlgoPackages = [
-    { os: 'Windows', version: 'v1.4.2', size: '82 MB' },
-    { os: 'macOS', version: 'v1.4.2', size: '78 MB' },
-    { os: 'Linux', version: 'v1.4.2', size: '74 MB' },
+    { os: 'Windows', version: 'v1.0', size: '2.11 MB' },
+    { os: 'macOS', version: 'v1.0', size: '2.11 MB' },
+    { os: 'Linux', version: 'v1.0', size: '2.11 MB' },
   ];
 
   const desktopAppPackages = [
@@ -43,7 +43,9 @@ const Downloads = () => {
               <p className="text-sm text-text-muted">Size: {item.size}</p>
               <Button className="mt-4 w-full gap-2 bg-[#00e5cc] text-[#0f1117] hover:bg-[#00cbb4]">
                 <Download size={16} />
-                Download
+                <a href="https://github.com/Mohamed6seddiki/MyAlgo.git" target="_blank" rel="noopener noreferrer">
+                  Download
+                </a>
               </Button>
             </div>
           ))}

@@ -14,8 +14,6 @@ const Settings = () => {
 
   const tabs = [
     { id: 'account', label: 'Account', icon: User },
-    { id: 'security', label: 'Security', icon: Lock },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'preferences', label: 'Preferences', icon: Moon },
   ];
 
@@ -84,19 +82,7 @@ const Settings = () => {
                  </div>
               </Card>
 
-              <Card className="p-6">
-                 <h2 className="text-xl font-bold mb-6">Email Addresses</h2>
-                 <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-background border border-border rounded-lg">
-                       <div>
-                         <p className="font-medium flex items-center gap-2">alex@university.edu <Badge variant="success" className="py-0.5 text-[10px]">Primary</Badge></p>
-                         <p className="text-sm text-text-muted mt-1">Verified</p>
-                       </div>
-                       <Button variant="ghost" size="sm" className="text-danger hover:text-danger hover:bg-danger/10">Remove</Button>
-                    </div>
-                 </div>
-                 <Button variant="secondary" className="mt-4 gap-2 border-dashed border-text-muted/50 text-text-muted w-full"><User size={16} /> Add Email Address</Button>
-              </Card>
+
             </>
           )}
 
@@ -131,75 +117,14 @@ const Settings = () => {
                     <h3 className="text-sm font-medium text-text-muted mb-4">Language</h3>
                     <select title="Preferred language" className="w-full max-w-sm bg-background border border-border rounded-md px-3 py-2 text-text focus:outline-none focus:ring-1 focus:border-primary transition-all">
                        <option>English (US)</option>
-                       <option>Spanish</option>
-                       <option>French</option>
                     </select>
                   </div>
                </div>
             </Card>
           )}
 
-          {activeTab === 'security' && (
-            <>
-              <Card className="p-6">
-                <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                  <Shield size={20} className="text-primary" />
-                  Security Settings
-                </h2>
-                <div className="space-y-4">
-                  <Input label="Current Password" type="password" placeholder="••••••••" />
-                  <Input label="New Password" type="password" placeholder="At least 8 characters" />
-                  <Input label="Confirm New Password" type="password" placeholder="Repeat new password" />
-                </div>
-                <div className="mt-6 flex justify-end">
-                  <Button className="gap-2"><Check size={16} /> Update Password</Button>
-                </div>
-              </Card>
 
-              <Card className="p-6">
-                <h3 className="text-lg font-bold mb-4">Two-factor Authentication</h3>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg border border-border bg-background p-4">
-                  <div>
-                    <p className="font-medium">Authenticator App</p>
-                    <p className="text-sm text-text-muted">Protect your account with a one-time verification code.</p>
-                  </div>
-                  <Button variant="secondary">Enable 2FA</Button>
-                </div>
-              </Card>
-            </>
-          )}
 
-          {activeTab === 'notifications' && (
-            <Card className="p-6">
-              <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                <Bell size={20} className="text-primary" />
-                Notification Preferences
-              </h2>
-              <div className="space-y-5">
-                {[
-                  { id: 'lesson-updates', title: 'Lesson updates', desc: 'Get notified when new lessons are published.' },
-                  { id: 'daily-reminder', title: 'Daily reminder', desc: 'Receive a reminder to keep your streak alive.' },
-                  { id: 'ai-tips', title: 'AI learning tips', desc: 'Weekly personalized tips from the AI assistant.' },
-                  { id: 'security-alerts', title: 'Security alerts', desc: 'Important login and account activity notifications.' },
-                ].map((item, index) => (
-                  <label key={item.id} className="flex items-start justify-between gap-4 rounded-lg border border-border bg-background p-4 cursor-pointer">
-                    <div>
-                      <p className="font-medium">{item.title}</p>
-                      <p className="text-sm text-text-muted">{item.desc}</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      defaultChecked={index < 2 || item.id === 'security-alerts'}
-                      className="mt-1 h-4 w-4 rounded border-border bg-background text-primary focus:ring-primary/50"
-                    />
-                  </label>
-                ))}
-              </div>
-              <div className="mt-6 flex justify-end">
-                <Button className="gap-2"><Check size={16} /> Save Preferences</Button>
-              </div>
-            </Card>
-          )}
 
         </div>
       </div>

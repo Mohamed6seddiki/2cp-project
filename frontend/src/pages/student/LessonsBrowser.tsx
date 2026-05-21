@@ -82,17 +82,7 @@ const LessonsBrowser = () => {
                onChange={(e) => setSearchQuery(e.target.value)}
              />
           </div>
-          <Button
-            variant="secondary"
-            className="px-3"
-            aria-label="Clear filters"
-            onClick={() => {
-              setActiveFilter('All');
-              setSearchQuery('');
-            }}
-          >
-            <Filter size={18} />
-          </Button>
+
         </div>
       </div>
 

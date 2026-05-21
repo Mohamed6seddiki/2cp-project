@@ -230,13 +230,20 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+var swaggerEnabled = builder.Configuration.GetValue<bool?>("Swagger:Enabled")
+    ?? builder.Environment.IsDevelopment();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+if (swaggerEnabled)
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(options =>
+    {
+        options.RoutePrefix = "swagger";
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Algonova Backend API v1");
+    });
 }
 
 app.UseForwardedHeaders();
