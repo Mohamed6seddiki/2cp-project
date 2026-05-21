@@ -1,0 +1,119 @@
+/* ===== تخصيص زر الفتح (الأيقونة العائمة) ===== */
+#n8n-chat button[aria-label*="Open"],
+#n8n-chat > div > button,
+.n8n-chat-button {
+  background: linear-gradient(135deg, #00D9B5 0%, #00C4A3 100%) !important;
+  box-shadow: 0 4px 20px rgba(0, 217, 181, 0.3) !important;
+  width: 60px !important;
+  height: 60px !important;
+  border-radius: 50% !important;
+  transition: all 0.3s ease-in-out !important;
+}
+
+/* أيقونة الزر */
+#n8n-chat button[aria-label*="Open"] svg,
+#n8n-chat > div > button svg,
+.n8n-chat-button svg {
+  color: #FFFFFF !important;
+  fill: #FFFFFF !important;
+}
+
+#n8n-chat button[aria-label*="Open"] svg path {
+  fill: #FFFFFF !important;
+  stroke: #FFFFFF !important;
+}
+
+/* ===== زر الإغلاق ===== */
+#n8n-chat button[aria-label*="Close"],
+.n8n-chat-close-button {
+  background: linear-gradient(135deg, #00D9B5 0%, #00C4A3 100%) !important;
+  box-shadow: 0 4px 20px rgba(0, 217, 181, 0.3) !important;
+}
+
+/* ===== Hover ===== */
+#n8n-chat button[aria-label*="Open"]:hover,
+#n8n-chat button[aria-label*="Close"]:hover {
+  transform: scale(1.05) !important;
+  box-shadow: 0 6px 30px rgba(0, 217, 181, 0.5) !important;
+}
+
+/* ===== Animation ===== */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 20px rgba(0, 217, 181, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 6px 25px rgba(0, 217, 181, 0.4);
+  }
+}
+
+#n8n-chat button[aria-label*="Open"] {
+  animation: pulse 2.5s ease-in-out infinite;
+}
+
+/* ===== Window ===== */
+.n8n-chat-window,
+#n8n-chat > div > div {
+  border: 1px solid rgba(0, 217, 181, 0.3);
+  box-shadow: 0 8px 40px rgba(0, 217, 181, 0.2);
+  border-radius: 16px;
+  background: #0A1628;
+}
+
+/* ===== Header ===== */
+.n8n-chat-header,
+#n8n-chat header {
+  background: linear-gradient(135deg, #1E2A3A 0%, #0A1628 100%);
+  border-bottom: 2px solid #00D9B5;
+  color: white;
+  border-radius: 16px 16px 0 0;
+  padding: 20px;
+}
+
+/* ===== Messages ===== */
+.n8n-chat-messages,
+#n8n-chat main {
+  background: #0A1628;
+}
+
+/* user message */
+.n8n-chat-message-user {
+  background: linear-gradient(135deg, #00D9B5 0%, #00C4A3 100%);
+  color: #0A1628;
+  border-radius: 12px 12px 4px 12px;
+}
+
+/* bot message */
+.n8n-chat-message-bot,
+.n8n-chat-message-assistant {
+  background: #1E2A3A;
+  color: white;
+  border: 1px solid rgba(0, 217, 181, 0.2);
+  border-radius: 12px 12px 12px 4px;
+}
+
+/* ===== Input ===== */
+#n8n-chat input,
+#n8n-chat textarea {
+  border: 1px solid rgba(0, 217, 181, 0.3);
+  background: #1E2A3A;
+  color: white;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+#n8n-chat input:focus,
+#n8n-chat textarea:focus {
+  border-color: #00D9B5;
+  box-shadow: 0 0 0 3px rgba(0, 217, 181, 0.15);
+  outline: none;
+}
+
+/* ===== Send button ===== */
+.n8n-chat-send-button {
+  background: linear-gradient(135deg, #00D9B5, #00C4A3);
+  border: none;
+  border-radius: 8px;
+}
